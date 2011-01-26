@@ -1,0 +1,32 @@
+<?php
+// $Id: date_popup_authored.module,v 1.1 2010/06/13 09:14:43 itafroma Exp $
+
+/**
+ * @file
+ * Provides a datepicker for the "Authored on" date field found on node forms.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function date_popup_authored_help($section) {
+  switch ($section) {
+    case 'admin/help#date_popup_authored':
+      // Return a line-break version of the module README
+      $readme = file_get_contents(dirname(__FILE__) . '/README.txt');
+      $readme = filter_filter('process', 2, NULL, $readme);
+      $readme = filter_filter('process', 1, NULL, $readme);
+
+      return $readme;
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function date_popup_authored_form_alter(&$form, $form_state, $form_id) {
+  if (strstr($form_id, '_node_form') !== FALSE) {
+    $form['author']['date']['#type'] = 'date_popup';
+    unset($form['author']['date']['#maxlength']);
+  }
+}

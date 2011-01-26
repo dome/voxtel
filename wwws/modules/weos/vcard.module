@@ -1,0 +1,903 @@
+<?php
+function card_menu_default_items() {
+	$items = array();
+
+	$items[] = array(
+    'title' => 'Card',
+    'path' => 'card',
+    'weight' => -2,
+    'description' => 'Provides a member directory and user management feature',
+	);
+	// Translatables
+	array(
+	t('Card'),
+	t('Provides a member directory and user management feature'),
+	);
+
+
+	return $items;
+}
+
+function vcard_menu() {
+	$items['card'] = array(
+            'description' => 'View card.', 'title' => 'Card',
+            'page callback' => 'vcard_overview',
+            'menu_name' => 'features',
+            'page arguments' => array('list'),
+            'weight' => -1,
+            'access arguments' => array('List card'),
+            'type' => MENU_NORMAL_ITEM,
+	);
+
+	$items['card/list'] = array(
+            'description' => 'View card.', 'title' => 'List',
+            'page callback' => 'vcard_overview',
+            'menu_name' => 'features',
+            'weight' => -1,
+            'access arguments' => array('List card'),
+            'type' => MENU_DEFAULT_LOCAL_TASK
+	);
+	$items['card/edit'] = array(
+            'title' => 'Edit Card',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => array('vcard_form'),
+            'access arguments' => array('access rate'),
+            'type' => MENU_CALLBACK);
+	$items['card/delete'] = array(
+            'title' => 'Delete bookmarks',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => array('vcard_lot_delete_confirm'),
+            'access arguments' => array('access rate'),
+            'type' => MENU_CALLBACK);
+	$items['card/add'] = array(
+            'title' => 'Add',
+            'menu_name' => 'features',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => array('vcard_form'),
+            'access arguments' => array('Add card'),
+            'type' => MENU_LOCAL_TASK);
+	$items['card/lot'] = array(
+            'title' => 'Card Lot',
+            'menu_name' => 'features',
+            'page callback' => 'vcard_lot',
+            'access arguments' => array('Card Lot card'),
+            'weight' => 10,
+            'type' => MENU_LOCAL_TASK);
+
+	$items['card/check'] = array(
+            'title' => 'Check Card',
+            'menu_name' => 'features',
+            'page callback' => 'vcard_check',
+            'access arguments' => array('Check Card card'),
+            'type' => MENU_LOCAL_TASK);
+
+	return $items;
+}
+
+function vcard_theme() {
+	return array(
+            'vcard_form_card' => array(
+                    'arguments' => array('form' => NULL),
+	),
+	);
+};
+function vcard_check_serial($dcard=NULL) {
+	global    $memcache;
+	if (!$dcard){
+		$output = drupal_get_form('vcard_lot_form_overview');
+		$search_str = $_SESSION['vcard_lot_search_filter'];
+	}else{
+		$search_str = $dcard;
+	}
+        $search_str = trim($search_str);
+	//Number , Rate Group , Balance , Create Date , Expire Date
+	$header = array(
+	array('data' => t('Seriual Number'), 'field' => 'serial'),
+	array('data' => t('PIN')),
+	array('data' => t('Rate Group'), 'field' => 'rate'),
+	array('data' => t('Balance'), 'field' => 'balance'),
+	array('data' => t('Create Date'), 'field' => 'create_date'),
+	array('data' => t('Expire Date'), 'field' => 'expdate'),
+	array('data' => t('Status'), 'field' => 'disable'),
+	array('data' => t('Operation')),
+	);
+
+	$tablesort = tablesort_sql($header);
+	//$_SESSION['vcard_search_filter'] = $search_str;
+	if ($search_str != '') {
+		$get_result = $memcache->get('card:'.$search_str);
+		$obj = json_decode($get_result);
+		if ($obj){
+			$search_str=$obj->ser;
+		};
+		$sql = "SELECT *,fdate1(create_date) As cdate,fdate1(i_days_expire) As expdate from vcard  where serial LIKE '$search_str%' ";
+		$sql_count = "SELECT count(id) from vcard  limit 1; ";
+	}else {
+	   return $output;
+        }
+	//$output.= '<div class="view-empty"><h2> PIN:'.$obj->no.' </h2>';
+	//    $output.= '<h2> Balance:'.$obj->amt.' </h2>';
+	//$output.= '</div>';
+	$result = pager_query($sql . $tablesort, 1,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$get_result = $memcache->get('serial:'.$rate->serial);
+		$obj = json_decode($get_result);
+		$get_result = $memcache->get('card:'.$obj->{'card'});
+		$obj = json_decode($get_result);
+		if ($rate->disable=='f'){
+		  $status = 'Enabled';
+		}else{
+		  $status = 'Disabled';
+		}
+                if (user_access('Lock Card/User')){
+                    $lock_str = l('Lock/Unlock Card','b/staff/lockcard/'.$rate->serial);
+                }else{
+                    $lock_str = '';
+                }
+		
+		$rows[] =
+		array(
+		// Cells
+		$rate->serial,
+		'<h2>'.$obj->no.'<h2>',
+		$rate->description,
+		$obj->{'amt'}/100,
+		$rate->cdate,
+		$rate->expdate,
+		$status,
+		$lock_str,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 6));
+	}
+	//Number , Top up To , Value , Date
+	$header1 = array(
+	
+	array('data' => t('PIN'), 'field' => 'ref'),
+	array('data' => t('Top up To'), 'field' => 'username'),
+	array('data' => t('Value'), 'field' => 'paid'),
+	array('data' => t('Date'), 'field' => 'date'),
+	array('data' => t('TopUP By'), 'field' => 'process_by'),
+	);
+	$sql = "SELECT *,date As cdate,ref As serial from vpayment  where ref = '".$obj->{'no'}."' ";
+	$sql_count = "SELECT count(username) from vpayment  where ref = '".$obj->{'no'}."' ";
+	$result1 = pager_query($sql . $tablesort, 20,0,$sql_count);
+	while ($pay = db_fetch_object($result1)) {
+	   if (strlen($pay->process_by)==0){
+	      $pbstr=' IVR';
+	   }else{
+	      $pbstr = $pay->process_by;
+	   }
+		$row1[] =
+		array(
+		$pay->ref,
+		$pay->username,
+		$pay->paid/100,
+		$pay->cdate,
+		$pbstr,
+		);
+	}
+
+	if (!$row1) {
+		$row1[] = array(array('data' => t('Data Not Found.'), 'colspan' => 6));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 20, 0);
+	$output .= theme('table', $header1, $row1);
+	$output .= theme('pager', NULL, 20, 0);
+	return $output;
+}
+
+function vcard_check($dcard=NULL) {
+	global    $memcache;
+	if (!$dcard){
+		$output = drupal_get_form('vcard_search_pin');
+		$search_str = $_SESSION['vcard_lot_search_filter'];
+	}else{
+		$search_str = $dcard;
+	}
+        $search_str = trim($search_str);
+	//Number , Rate Group , Balance , Create Date , Expire Date
+	$header = array(
+	array('data' => t('Seriual Number'), 'field' => 'serial'),
+	array('data' => t('Rate Group'), 'field' => 'rate'),
+	array('data' => t('Balance'), 'field' => 'balance'),
+	array('data' => t('Create Date'), 'field' => 'create_date'),
+	array('data' => t('Expire Date'), 'field' => 'expdate'),
+	array('data' => t('Status'), 'field' => 'disable'),
+	array('data' => t('Operation'), 'field' => 'disable'),
+	);
+
+	$tablesort = tablesort_sql($header);
+	//$_SESSION['vcard_search_filter'] = $search_str;
+	if ($search_str != '') {
+		$get_result = $memcache->get('card:'.$search_str);
+		$obj = json_decode($get_result);
+		if ($obj){
+			$search_str=$obj->ser;
+		}else{
+		    return $output;
+		}
+		$sql = "SELECT *,fdate1(create_date) As cdate,fdate1(i_days_expire) As expdate from vcard  where serial LIKE '$search_str%' ";
+		$sql_count = "SELECT count(id) from vcard  limit 1; ";
+	}else {
+	   return $output;
+        }
+	$output.= '<div class="view-empty"><h2> PIN:'.$obj->no.' </h2>';
+	//    $output.= '<h2> Balance:'.$obj->amt.' </h2>';
+	$output.= '</div>';
+	$result = pager_query($sql . $tablesort, 1,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$get_result = $memcache->get('serial:'.$rate->serial);
+		$obj = json_decode($get_result);
+		$get_result = $memcache->get('card:'.$obj->{'card'});
+		$obj = json_decode($get_result);
+		if ($rate->disable=='f'){
+		  $status = 'Enabled';
+		}else{
+		  $status = 'Disabled';
+		}
+		$rows[] =
+		array(
+		// Cells
+		$rate->serial,
+		$rate->description,
+		$obj->{'amt'}/100,
+		$rate->cdate,
+		$rate->expdate,
+		$status,
+		l('Lock/Unlock Card','b/staff/lockcard/'.$rate->serial),
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 6));
+	}
+	//Number , Top up To , Value , Date
+	$header1 = array(
+	
+	array('data' => t('PIN'), 'field' => 'ref'),
+	array('data' => t('Top up To'), 'field' => 'username'),
+	array('data' => t('Value'), 'field' => 'paid'),
+	array('data' => t('Date'), 'field' => 'date'),
+	array('data' => t('TopUP By'), 'field' => 'process_by'),
+	);
+	$sql = "SELECT *,date As cdate,ref As serial from vpayment  where ref = '".$obj->{'no'}."' ";
+	$sql_count = "SELECT count(username) from vpayment  where ref = '".$obj->{'no'}."' ";
+	$result1 = pager_query($sql . $tablesort, 20,0,$sql_count);
+	while ($pay = db_fetch_object($result1)) {
+	   if (strlen($pay->process_by)==0){
+	      $pbstr=' IVR';
+	   }else{
+	      $pbstr = $pay->process_by;
+	   }
+		$row1[] =
+		array(
+		$pay->ref,
+		$pay->username,
+		$pay->paid/100,
+		$pay->cdate,
+		$pbstr,
+		);
+	}
+
+	if (!$row1) {
+		$row1[] = array(array('data' => t('Data Not Found.'), 'colspan' => 6));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 20, 0);
+	$output .= theme('table', $header1, $row1);
+	$output .= theme('pager', NULL, 20, 0);
+	return $output;
+}
+
+function vcard_lot() {
+	$output = drupal_get_form('vcard_lot_form_overview');
+	$header = array(
+	array('data' => t('Brand'), 'field' => 'brand'),
+	array('data' => t('Exp (days)'), 'field' => 'days_expire'),
+	array('data' => t('Exp (days) use'), 'field' => 'day_use_expire'),
+	array('data' => t('Create Date'), 'field' => 'create_date'),
+	array('data' => t('QTY'), 'field' => 'qty'),
+	array('data' => t('Value'), 'field' => 'price'),
+	array('data' => t('Currency'), 'field' => 'currency'),
+	array('data' => t('Rate Group'), 'field' => 'rate'),
+	array('data' => t('Operations'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vcard_lot_search_filter'];
+	$sql = "SELECT *,fdate1(card_lot.create_date) As cdate,card_lot.id as card_lot_id, voiptariffgrp.description As create_date from card_lot LEFT JOIN voiptariffgrp ON card_lot.rate = voiptariffgrp.id";
+	if ($search_str != '') {
+		$sql .= " WHERE brand LIKE '$search_str%' ";
+	}else
+	$sql .= " ";
+
+	//echo $sql;
+	$result = pager_query($sql . $tablesort, 20);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->brand,
+		$rate->days_expire,
+		$rate->days_use_expire,
+		$rate->cdate,
+		$rate->qty,
+		$rate->price,
+		$rate->currency,
+		$rate->description,
+		l('Edit', 'card/edit/'. $rate->card_lot_id, array('html' => TRUE))." ".
+		l('Delete', 'card/delete/'. $rate->card_lot_id, array('html' => TRUE)),
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 6));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 20, 0);
+	return $output;
+}
+
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vcard_cron() {
+	//  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+	//  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vcard_user($op, &$edit, &$user) {
+
+}
+
+function vcard_search_pin() {
+	if (empty($_SESSION['vcard_search_filter'])) {
+		$_SESSION['vcard_search_filter'] = '';
+	}
+
+	$form['search'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Search PIN',
+            '#size' => 10,
+            '#maxlength' => 10,
+	//            '#default_value' => $_SESSION['vcard_search_filter']
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	//  $form['#redirect'] = FALSE;
+
+	return $form;
+}
+function vcard_search_pin_submit($form, &$form_state) {
+	$_SESSION['vcard_lot_search_filter'] = $form_state['values']['search'];
+}
+
+
+function vcard_lot_form_overview() {
+	if (empty($_SESSION['vcard_search_filter'])) {
+		$_SESSION['vcard_search_filter'] = '';
+	}
+
+	$form['search'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Search Serial Or PIN',
+            '#size' => 14,
+            '#maxlength' => 14,
+	//            '#default_value' => $_SESSION['vcard_search_filter']
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	//  $form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function vcard_form_overview() {
+
+	$types = array();
+
+	$names[0] = "All";
+	$result = db_query('SELECT brand,id,fdate1(create_date) As cdate FROM card_lot ORDER BY create_date DESC');
+
+	while ($object = db_fetch_object($result)) {
+		$names[$object->id] = $object->cdate." ".$object->brand."  ";
+	}
+	//  print_r($names);
+	if (empty($_SESSION['vcard_brand_filter'])) {
+		$_SESSION['vcard_brand_filter'] = 0;
+	}
+	if (empty($_SESSION['vcard_search_filter'])) {
+		$_SESSION['vcard_search_filter'] = '';
+	}
+
+	$form['filter_group'] = array('#type' => 'fieldset',
+            '#title' => t('Search'),
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+	);
+
+	$form['filter_group']['filter'] = array(
+            '#type' => 'select',
+            '#title' => t('Filter by Card'),
+            '#options' => $names,
+            '#default_value' => $_SESSION['vcard_brand_filter']
+	);
+	$lpage = array();
+	$lpage[10]="10";
+	$lpage[50]="50";
+	$lpage[100]="100";
+	$lpage[200]="200";
+	$lpage[500]="500";
+	$form['filter_group']['line_per_page'] = array(
+            '#type' => 'select',
+            '#title' => t('Line Page'),
+            '#options' => $lpage,
+            '#default_value' => $_SESSION['line_per_page']
+	);
+	//checkboxes
+	$form['filter_group']['used'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Used'),
+            '#default_value' => $_SESSION['used']
+	);
+
+	$form['filter_group']['search'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Search',
+            '#size' => 20,
+            '#default_value' => $_SESSION['vcard_search_filter']
+	);
+
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	if (user_access('access superviser')){
+		$form['filter_export'] = array('#type' => 'fieldset',
+            '#title' => t('Export'),
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+		);
+		$form['filter_export']['excel'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Excel'),
+            '#return_value' => 1,
+		);
+		$form['filter_export']['export'] = array('#type' => 'submit', '#value' =>t('Export'));
+	};
+	$form['filter_group']['#redirect'] = FALSE;
+
+	return $form;
+}
+
+
+function vcard_form_card_submit($form, &$form_state) {
+	$operation = $form_state['values']['operation'];
+	//print_r($form_state['values']);
+	//print_r($form_state['values']['nodes']);
+	$nodes = array_filter($form_state['values']['nodes']);
+	$sql_str="'";
+	foreach ($nodes as $key) {
+		$sql_str .= $key."','";
+	};
+	//print $sql_str;
+	//die;
+	//print substr($sql_str, 0, -1);
+	//die;
+	$sql_str = substr($sql_str, 0, -2);
+	if (strlen($sql_str) > 0)
+	if ($operation=='disable')
+	$result = db_query("UPDATE a_card set disable = true where serial in (".$sql_str.");");
+	else
+	$result = db_query("UPDATE a_card set disable = false where serial in (".$sql_str.");");
+
+	//     echo $operation;
+	//     echo $sql_str;
+
+}
+
+function vcard_form_card() {
+	global    $memcache;
+
+	//          CASE
+	//                WHEN first_use IS NOT NULL  THEN
+	//               fdate1(i_days_use_expire)
+	//            ELSE
+
+	$sql = "SELECT * ,
+                 fdate1(create_date) AS cr_date,
+                 fdate1(i_days_expire) AS exp_date,
+          CASE
+                WHEN disable  THEN
+                 0
+            ELSE
+                 1
+     END AS c_active
+
+     FROM vcard  Where 0=0 ";
+
+	$sql_count = " select count(id) from vcard where 0=0 ";
+	if ($_SESSION['vcard_brand_filter'] > 0) {
+		$sql .= "AND id=".$_SESSION['vcard_brand_filter'];
+		$sql_count .= "AND id=".$_SESSION['vcard_brand_filter'];
+	};
+	if (strlen($_SESSION['vcard_search_filter'])>0) {
+		$sql .= "AND serial Like '".$_SESSION['vcard_search_filter']."%'";
+		$sql_count .= "AND serial Like '".$_SESSION['vcard_search_filter']."%'";
+	};
+//	echo $_SESSION['used'];
+
+	if ($_SESSION['used']>0) {
+		$sql .= "AND used";
+		$sql_count .= "AND used";
+	};
+	//  echo $_SESSION['vcard_search_filter'];
+	//  echo $_SESSION['vcard_brand_filter'];
+	//  echo $sql;
+	$sql .= "  order by serial ";
+	$countrows = db_result(db_query($sql_count));
+//	echo $countrows;
+	//echo $r->rowCount();    
+
+	if ($_SESSION['line_per_page']<=0)
+	$_SESSION['line_per_page']=10;
+	$result = pager_query($sql , $_SESSION['line_per_page'],0,$sql_count);
+	//$result = pager_query($sql);
+
+	$form['options'] = array('#type' => 'fieldset',
+            '#title' => t('Update options'),
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+	);
+	$options = array();
+	$options['enable'] = 'Enable';
+	$options['disable'] = 'Disable';
+
+	$form['options']['operation'] = array('#type' => 'select', '#options' => $options,  '#default_value' => 'enable');
+	$form['options']['submit'] = array('#type' => 'submit', '#value' => t('Update'));
+	$form['options']['msg'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Total:',
+            '#size' => 20,
+            '#default_value' => $countrows,
+            '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$destination = drupal_get_destination();
+
+	//print $obj->{'amt'};
+
+	$i=1;
+	while ($node = db_fetch_object($result)) {
+		//echo $node->serial;
+		$get_result = $memcache->get('serial:'.$node->serial);
+		$obj = json_decode($get_result);
+		$form['serial'][$node->serial] = array('#value' => $node->serial);
+		$form['no'][$node->serial] = array('#value' => $obj->{'card'});
+		$get_result = $memcache->get('card:'.$obj->{'card'});
+		$obj = json_decode($get_result);
+		$nodes[$node->serial] = '';
+		if ($node->disable=='t')
+		$form['status'][$node->serial] =  array('#value' =>  t('Disable'));
+		else
+		$form['status'][$node->serial] =  array('#value' =>  t('Enable'));
+
+		$form['balance'][$node->serial] = array('#value' => $obj->{'amt'}/100);
+		$form['currencysym'][$node->serial] = array('#value' => $node->currency);
+		$form['create_date'][$node->serial] = array('#value' => $node->cr_date);
+		$form['exp_date'][$node->serial] = array('#value' => $node->exp_date);
+		$form['brand'][$node->serial] = array('#value' => $node->brand);
+		$form['ref'][$node->serial] = array('#value' => $node->ref);
+		$i++;
+
+	}
+	$form['nodes'] = array('#type' => 'checkboxes', '#options' => $nodes);
+	$form['pager'] = array('#value' => theme('pager', NULL, 50, 0));
+	$form['#theme'] = 'vcard_form_card';
+	return $form;
+}
+
+/**
+ * Theme node administration overview.
+ */
+function theme_vcard_form_card($form) {
+	// Overview table:
+	$header = array(theme('table_select_header_cell'),t('Serial'), t('PIN'),t('Status'), t('Balance'), t('Currency'), t('Craete'), t('Expire'), t('Brand'), t('Ref'));
+	//print_r($form);
+	$output .= drupal_render($form['options']);
+	if (isset($form['serial']) && is_array($form['serial'])) {
+		foreach (element_children($form['serial']) as $key) {
+			$row = array();
+			$row[] = drupal_render($form['nodes'][$key]);
+			$row[] = drupal_render($form['serial'][$key]);
+			$row[] = drupal_render($form['no'][$key]);
+			$row[] = drupal_render($form['status'][$key]);
+			$row[] = drupal_render($form['balance'][$key]);
+			$row[] = drupal_render($form['currencysym'][$key]);
+			$row[] = drupal_render($form['create_date'][$key]);
+			$row[] = drupal_render($form['exp_date'][$key]);
+			$row[] = drupal_render($form['brand'][$key]);
+			$row[] = drupal_render($form['ref'][$key]);
+			$rows[] = $row;
+		}
+
+	}
+	else {
+		$rows[] = array(array('data' => t('Data not found.'), 'colspan' => '20'));
+	}
+
+	$output .= theme('table', $header, $rows);
+	if ($form['pager']['#value']) {
+		$output .= drupal_render($form['pager']);
+	}
+
+	$output .= drupal_render($form);
+
+	return $output;
+}
+
+function vcard_overview() {
+	$output = drupal_get_form('vcard_form_overview');
+	$output .= drupal_get_form('vcard_form_card');
+	//$output = drupal_get_form('node_admin_nodes');
+	return $output;
+};
+
+
+
+/**
+ * Menu callback; generic function to display a page of the most frequent
+ * watchdog events of a specified type.
+ */
+function vcard_top($type) {
+
+	$header = array(
+	array('data' => t('Count'), 'field' => 'count', 'sort' => 'desc'),
+	array('data' => t('Message'), 'field' => 'message')
+	);
+
+	$result = pager_query("SELECT COUNT(wid) AS count, message FROM {watchdog} WHERE type = '%s' GROUP BY message ". tablesort_sql($header), 30, 0, "SELECT COUNT(DISTINCT(message)) FROM {watchdog} WHERE type = '%s'", $type);
+
+	while ($watchdog = db_fetch_object($result)) {
+		$rows[] = array($watchdog->count, truncate_utf8($watchdog->message, 56, TRUE, TRUE));
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 2));
+	}
+
+	$output  = theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 30, 0);
+
+	return $output;
+}
+
+function vcard_form_overview_submit($form, &$form_state) {
+	//    echo $form_state['values']['excel'];
+	//
+	//echo $form_state['values']['export'];
+	//echo $form;
+	//    die;
+	$_SESSION['vcard_search_filter'] = $form_state['values']['search'];
+	$_SESSION['vcard_brand_filter'] = $form_state['values']['filter'];
+	$_SESSION['line_per_page'] = $form_state['values']['line_per_page'];
+	$_SESSION['used'] = $form_state['values']['used'];
+	if ($form_state['values']['excel']==1) {
+		//username	secret	number	days_use_expire	create_date	brand	balance	currencysym
+		$sql = 'select * from a_get_card_t('.$_SESSION['vcard_brand_filter'].')';
+		if ($_SESSION['vcard_brand_filter'] > 0) {
+			$sql = 'select * from a_get_card_t('.$_SESSION['vcard_brand_filter'].')';
+			$_SESSION['sqlstr'] = $sql;
+			$_SESSION['filename'] = "card.xls";
+			drupal_goto('excel');
+		};
+
+		//die;
+	};
+}
+
+function vcard_lot_form_overview_submit($form, &$form_state) {
+	$_SESSION['vcard_lot_search_filter'] = $form_state['values']['search'];
+}
+//$form_state, $node
+function vcard_form($form_state,$id = NULL) {
+	if ($id) {
+		$result = db_query("SELECT * FROM card_lot WHERE id = %d", $id);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			return drupal_goto('card');
+		}
+
+		$form['id'] = array(
+                '#type' => 'value',
+                '#value' => $card_lot->id,
+		);
+	}
+
+	$form['brand'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Brand"),
+            '#default_value' => $card_lot->brand,
+            '#description' => t("The brand of this card lot."),
+            '#maxlength' => 255,
+            '#required' => true,
+	);
+
+	if ($id) {
+		$form['prefix'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Serial Prefix"),
+            '#default_value' => $card_lot->serial_prefix,
+            '#description' => t("Serial prefix."),
+            '#maxlength' => 6,
+            '#required' => true,
+            '#attributes' => array('readonly' => 'readonly'),
+		);
+	}else{
+		$form['prefix'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Serial Prefix"),
+            '#default_value' => $card_lot->serial_prefix,
+            '#description' => t("Serial prefix."),
+            '#maxlength' => 6,
+            '#required' => true,
+		);
+	}
+	$form['days_expire'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Expire (days)"),
+            '#default_value' => $card_lot->days_expire,
+            '#required' => true,
+	);
+
+	$form['days_use_expire'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Expire (days) After first use"),
+            '#default_value' => $card_lot->days_use_expire,
+            '#required' => true,
+	);
+	if ($id) {
+		$form['qty'] = array(
+            '#type' => 'textfield',
+            '#title' => t("QTY"),
+            '#default_value' => $card_lot->qty,
+            '#required' => true,
+            '#attributes' => array('readonly' => 'readonly'),
+		);
+
+		$form['price'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Value"),
+            '#default_value' => $card_lot->price,
+            '#required' => true,
+            '#attributes' => array('readonly' => 'readonly'),
+		);
+	}else{
+		$form['qty'] = array(
+            '#type' => 'textfield',
+            '#title' => t("QTY"),
+            '#default_value' => $card_lot->qty,
+            '#required' => true,
+		);
+
+		$form['price'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Value"),
+            '#default_value' => $card_lot->price,
+            '#required' => true,
+		);
+
+	}
+	if (strlen($card_lot->currency)==0) {
+		$card_lot->currency="THB";
+	};
+
+	$form['currency'] = array(
+            '#type' => 'textfield',
+            '#title' => t("Currency"),
+            '#default_value' => $card_lot->currency,
+            '#required' => true,
+	);
+
+	$types = array();
+	$result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+	while ($object = db_fetch_object($result)) {
+		$names[$object->id] = $object->description;
+	}
+	$form['rategr'] = array(
+            '#type' => 'select',
+            '#title' => t("rate"),
+            '#options' => $names,
+            '#default_value' => $card_lot->rate,
+            '#required' => true,
+	);
+
+	/*
+	 $form['rategr'] = array(
+	 '#type' => 'textfield',
+	 '#title' => t("rate"),
+	 '#default_value' => $card_lot->rate,
+	 '#required' => true,
+	 );
+	 */
+	$form['submit'] = array(
+            '#type' => 'submit',
+            '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+function vcard_form_confirm($form, &$form_state) {
+	$form['id'] = array('#type' => 'value', '#value' => $card_lot->id);
+	return confirm_form($form,
+	t('Are you sure you want create  %brand?', array('%brand' => $card_lot->brand)),
+	$_GET['destination'] ? $_GET['destination'] : 'card/lot',
+	t('This action cannot be undone.'),
+	t('Delete'), t('Cancel')
+	);
+}
+
+function vcard_form_submit($form, &$form_state) {
+	if ($form_state['values']['id']) {
+		$id = $form_state['values']['id'];
+		db_query("UPDATE card_lot SET brand = '%s', days_expire = %d, days_use_expire = %d, qty = %d, price = %d
+    , currency = '%s',rate = %d WHERE id = %d", $form_state['values']['brand'], $form_state['values']['days_expire'],
+		$form_state['values']['days_use_expire'], $form_state['values']['qty']
+		, $form_state['values']['price'], $form_state['values']['currency'],$form_state['values']['rategr'], $form_state['values']['id']);
+		drupal_set_message("Card  '".$form_state['values'][brand]."' has been saved.");
+	}
+	else {
+		//create_card_cur
+		/*
+		"qty" integer, "amt" integer, "exp_day" integer, "exp_day_use" integer,
+		"grp" integer, "brand" character varying, "currency" character varying,
+		"prefix" character varying
+		*/
+		db_query("SELECT a_create_card(%d,%d,%d,%d,%d,'%s','%s','%s')",
+		$form_state['values']['qty'], $form_state['values']['price'], $form_state['values']['days_expire'],
+		$form_state['values']['days_use_expire'],$form_state['values']['rategr'],
+		$form_state['values']['brand'], $form_state['values']['currency'], $form_state['values']['prefix']);
+		drupal_set_message("Card  '".$form_state['values'][brand]."' has been Created.");
+	}
+	drupal_goto('card/lot');
+}
+
+/**
+ * Delete bookmark page
+ */
+function vcard_lot_delete_confirm($id = NULL) {
+	$card_lot = db_fetch_object(db_query("SELECT * from card_lot WHERE id = %d", $id));
+
+	if (!$card_lot) {
+		drupal_goto('card/lot');
+	}
+
+	$form['id'] = array('#type' => 'value', '#value' => $card_lot->id);
+	return confirm_form($form,
+	t('Are you sure you want to delete %brand?', array('%brand' => $card_lot->brand)),
+	$_GET['destination'] ? $_GET['destination'] : 'card/lot',
+	t('This action cannot be undone.'),
+	t('Delete'), t('Cancel')
+	);
+}
+
+function vcard_lot_delete_confirm_submit($form, &$form_state) {
+	if ($form_state['values']['confirm']) {
+		db_query("DELETE FROM card_lot WHERE id = %d", $form_state['values']['id']);
+		drupal_goto('card/lot');
+	}
+}

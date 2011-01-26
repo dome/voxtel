@@ -1,0 +1,9 @@
+<?php
+function z_report_permission_perm() {
+        return array(
+	   'List report','Provider Report report', 'Graph report', 'Card report', 'Summary report', 
+	    'Summary Provider report','Top 10 Dest report'
+        );
+}
+
+?>

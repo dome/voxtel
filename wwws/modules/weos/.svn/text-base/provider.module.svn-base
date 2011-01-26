@@ -1,0 +1,1165 @@
+<?php
+//test patch
+
+function provider_menu() {
+    $items = array();
+        
+        
+            $items['weos/provider'] = array(
+                'description' => 'View rate.', 'title' => 'Provider',
+                'page callback' => 'provider_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_NORMAL_ITEM,
+                );
+        
+            $items['weos/provider/list'] = array(
+                'description' => 'View rate.', 'title' => 'Provider Rate',
+                'page callback' => 'provider_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_DEFAULT_LOCAL_TASK
+                );
+        
+        
+            $items['weos/provider/add'] = array(
+                'description' => 'Add new rate.', 'title' => 'Add Rate',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK, 'weight' => 1);    
+        
+            $items['weos/provider/edit'] = array(
+                'title' => 'Edit Provider',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+            $items['weos/provider/delete'] = array(
+                'title' => 'Delete Rate',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+        
+            $items['weos/provider/group'] = array(
+                'description' => 'Provider.', 'title' => 'Provider',
+                'page callback' => 'provider_group_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK, 'weight' => 1);    
+        
+            $items['weos/provider/addgroup'] = array(
+                'description' => 'Add new provider.', 'title' => 'Add Provider',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_group_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK, 'weight' => 2);    
+
+            $items['weos/provider/exportrate'] = array(
+                'description' => 'Export Rate.', 'title' => 'Export Rate',
+                'page callback' => 'provider_export_rate',
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK, 'weight' => 10);    
+        
+        
+            $items['weos/provider/group_edit'] = array(
+                'title' => 'Edit Group',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_group_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+        
+            $items['weos/provider/group_delete'] = array(
+                'title' => 'Delete Group',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_group_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+        
+            $items['weos/provider/gateway'] = array(
+                'title' => 'Gateway',
+                'page callback' => 'provider_gateway_overview',
+                'access arguments' => array('access rate'),
+                'type' => MENU_NORMAL_ITEM);
+        
+            $items['weos/provider/gateway/add'] = array(
+                'title' => 'Add GW',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_gateway_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_NORMAL_ITEM, 'weight' => 1);    
+        
+            $items['weos/provider/gateway/edit'] = array(
+                'title' => 'Edit Provider',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_gateway_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+            $items['weos/provider/gateway/delete'] = array(
+                'title' => 'Delete Rate',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_gateway_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+            $items['weos/provider/import'] = array(
+                'title' => 'Import Rate',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('provider_rate_import_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK);
+
+        
+    return $items;
+}
+
+function provider_export_rate() {
+  $header = array(
+    array('data' => t('Prefix'), 'field' => 'prefix'),
+    array('data' => t('Description'), 'field' => 'description'),
+    array('data' => t('Price'), 'field' => 'price'),
+    array('data' => t('Provider'), 'field' => 'provider'),
+    array('data' => l('Export','weos/excel'))
+  );
+
+  $tablesort = tablesort_sql($header);
+  $sql = "SELECT * from p_rate_low ";
+  $sql_export = "SELECT * from p_rate_low ";
+  $_SESSION['sqlstr'] = $sql_export;
+  $_SESSION['filename'] = "lct_rate.xls";
+
+  $result = pager_query($sql . $tablesort, 20);
+
+  while ($rate = db_fetch_object($result)) {
+    $rows[] =
+      array(
+        // Cells
+        $rate->prefix,
+        $rate->description,
+        $rate->price,
+        $rate->provider,
+	'',
+    );
+  }
+
+  if (!$rows) {
+    $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+  }
+
+  $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 20, 0);
+
+  return $output;
+}
+
+function provider_rate_import_form($form_state,$id = NULL) {
+$form = array('#attributes' => array('enctype' => 'multipart/form-data'));     
+            $types = array();
+            $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+            while ($object = db_fetch_object($result)) {
+                    $names[$object->id] = $object->provider;
+                }
+            $form['provider_id'] = array(
+                '#type' => 'select',
+                '#title' => t('Provider'),
+                '#options' => $names,
+                '#default_value' => $_SESSION['rate_overview_filter']
+                );
+        
+        // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+	$form['remove'] = array(
+	'#type' => 'checkbox',
+	'#title' => t('Remove before Add new Rate.'),
+	'#size' => 20,
+	); 
+	
+	$form['update'] = array(
+	'#type' => 'checkbox',
+	'#title' => t('Update old table.'),
+	'#size' => 20,
+	); 
+	
+    $form['upload'] = array(                                                                                                                                  
+        '#type' => 'file',                                                                                                                                      
+        '#title' => t('CSV file'),                                                                                                                              
+	'#description' => t('CSV format: prefix,price,description,currencysym,initialincrement,regularincrement,graceperiod'),
+        );                                                                                                                                                        
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+        );
+
+
+    return $form;
+}
+function provider_rate_import_form_validate($form, &$form_state) {                                                                                             
+  
+/* TODO Modify the validators array to suit your needs.
+   This array is used in the revised file_save_upload */
+  $validators = array(
+    //'file_validate_is_image' => array(),
+    //'file_validate_image_resolution' => array('85x85'),
+    //'file_validate_size' => array(30 * 1024),
+  );
+
+//        if (!file_save_upload(file_check_upload, $validators)) {
+  //          form_set_error('upload', t('Please upload a file.'));
+    //    }
+}      
+/**
+* Add/Edit bookmark form submit
+*/
+function provider_rate_import_form_submit($form, &$form_state) {
+    //print_r($form);
+    $buffer = '';                                                                                                                                             
+/* TODO Modify the validators array to suit your needs.
+   This array is used in the revised file_save_upload */
+  $validators = array(
+    'file_validate_is_image' => array(),
+    'file_validate_image_resolution' => array('85x85'),
+    'file_validate_size' => array(30 * 1024),
+  );
+  // Save new file uploads.
+  if ($file = file_save_upload('upload')) {
+    $file->list = variable_get('upload_list_default', 1);
+    $file->description = $file->filename;
+    $file->weight = 0;
+    $file->new = TRUE;
+    $form['#node']->files[$file->fid] = $file;
+    $form_state['values']['files'][$file->fid] = (array)$file;
+  }
+
+ //   $file = file_save_upload(file_check_upload, $validators);
+    //print_r($file);
+    //echo $file->filename;
+    //die;
+    $handle = fopen($file->filepath, 'r');                                                                                                                    
+    set_time_limit(0);
+   
+    //the top line is the field names
+    $fields = fgetcsv($handle, 4096, ',');
+    
+    $sqlstr = "";
+    if ($form['remove']==1) {
+       $sqlstr .= "Delete from voip_prates where provider_id=".$form['provider_id'].";"; 
+    };
+    while (($data = fgetcsv($handle, 4096, ',')) !== FALSE)
+    {
+        $data = array_combine($fields, $data);
+        if($form_state['values']['update']==1){
+        	$data['provider_id'] = $form_state['values']['provider_id'];
+        	$sqlstr .= db_build_update("voip_prates",$data,"provider_id",$form['provider_id']);
+        }else{
+	        $data['provider_id'] = $form_state['values']['provider_id'];
+            $sqlstr .= db_build_insert("voip_prates",$data);
+        }
+    };
+
+    fclose($handle);   
+    //echo $sqlstr."<br />";
+    //die;
+        $sqlstr = "BEGIN;  \n".$sqlstr."  \nCOMMIT;";
+        db_query($sqlstr);
+        drupal_set_message("Rate has been Add.");
+        drupal_goto('weos/provider');
+}
+
+function db_build_update($table,$array,$wherefield,$x)
+{
+$sql = db_query("select prefix from $table where prefix='$array[prefix]' and $wherefield='$x'");
+$rows = db_num_rows($sql);
+if($rows == "1"){
+   $str = "update $table set ";
+   $strn = "";
+   $strv = " WHERE prefix='$array[prefix]' and $wherefield='$x'";
+   while(list($name,$value) = each($array)) {
+
+       if(is_bool($value)) {
+               $strn .= "$name=$value ? true:false,";
+                continue;
+        };
+
+       if(is_string($value)) {
+               $strn .= "$name='$value',";
+                continue;
+        }
+       if (!is_null($value) and ($value != "")) {
+               $strn .= "$name=$value,";
+                continue;
+       }
+   }
+   $sub = substr($strn,0,-1);
+   $str .= $sub . $strv;
+}else{
+   $str = "insert into $table ";
+   $strn = "(";
+   $strv = " VALUES (";
+   while(list($name,$value) = each($array)) {
+
+       if(is_bool($value)) {
+                $strn .= "$name,";
+                $strv .= ($value ? "true":"false") . ",";
+                continue;
+        };
+
+       if(is_string($value)) {
+                $strn .= "$name,";
+                $strv .= "'$value',";
+                continue;
+        }
+       if (!is_null($value) and ($value != "")) {
+                $strn .= "$name,";
+                $strv .= "$value,";
+                continue;
+       }
+   }
+   $strn[strlen($strn)-1] = ')';
+   $strv[strlen($strv)-1] = ')';
+   $str .= $strn . $strv;
+  }
+  
+   return $str.";";
+
+}
+
+function provider_gateway_overview() {
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = l('Add GW','weos/provider/gateway/add');
+    $output .= drupal_get_form('provider_form_overview');
+        //priority,protocol,prefix,ip,port,chan_group,provider_id,cutbool,nrdigcut,poscut,replacebool,posrpl,digrpl,nrdigrpl,formats,rtp_forward,maxport
+    $header = array(
+        array('data' => t('Provider'), 'field' => 'provider'),
+        array('data' => t('Priority'), 'field' => 'priority'),
+        array('data' => t('IP'), 'field' => 'ip'),
+        array('data' => t('Protocol'), 'field' => 'protocol'),
+        array('data' => t('Port'), 'field' => 'port'),
+        array('data' => t('Prefix'), 'field' => 'prefix'),
+        array('data' => t('Codec'), 'field' => 'formats'),
+        array('data' => t('RTP'), 'field' => 'rtp_forwat'),
+        array('data' => t('MAX Ports'), 'field' => 'maxport'),
+        array('data' => t('Operations'))
+        );
+
+    $tablesort = tablesort_sql($header);
+    $type = $_SESSION['provider_overview_filter'];
+    $search_str = $_SESSION['provider_search_filter'];
+    $sql = "
+        SELECT y_routes.id,priority,protocol,prefix,y_routes.ip,y_routes.port,provider_id,formats,rtp_forward,maxport,voip_providers.provider
+        FROM y_routes
+        LEFT JOIN voip_providers ON y_routes.provider_id::integer = voip_providers.id 
+        ";
+    $sql_count = "select count(id) from y_routes";
+    if ($type != '0') {
+            $sql .= " WHERE provider_id::integer = $type ";
+            $sql_count .= " WHERE provider_id::integer = $type ";
+        }else{
+            $sql .= " WHERE 0=0 ";
+            $sql_count .= " WHERE 0=0 ";
+        
+        }
+    if ($search_str != '') {
+            $sql .= " AND y_routes.ip LIKE '$search_str%'";
+            $sql_count .= " AND y_routes.ip LIKE '$search_str%'";
+            };
+        //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+            if ($rate->rtp_forward=="t") {
+                    $rtp = "Forward";  
+                
+                }else{
+                    $rtp="Proxy";
+                
+                }
+            $rows[] = array(
+                // Cells
+                $rate->provider,
+                $rate->priority,
+                $rate->ip,
+                $rate->protocol,
+                $rate->port,
+                $rate->prefix,
+                $rate->formats,
+                //$rate->rtp_forward ? "Yes" : "No",
+                $rtp,
+                $rate->maxport,
+                l('Edit','weos/provider/gateway/edit/'.$rate->id).' '.l('Delete','weos/provider/gateway/delete/'.$rate->id),
+                );
+        }
+
+    if (!$rows) {
+            $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+        }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+function provider_gateway_form($form_state,$id = NULL) {
+    if ($id) {
+            $result = db_query("SELECT * FROM y_routes WHERE id = %d", $id);
+            $gw = db_fetch_object($result);
+            if (!$gw) {
+                    return drupal_goto('weos/provider/gateway');
+                }
+        
+            $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $gw->id,
+                );
+        }else{
+            $types = array();
+            $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+            while ($object = db_fetch_object($result)) {
+                    $names[$object->id] = $object->provider;
+                }
+            $form['provider_id'] = array(
+                '#type' => 'select',
+                '#title' => t('Provider'),
+                '#options' => $names,
+                '#default_value' => $_SESSION['provider_overview_filter']
+                );
+                $gw->atime=0;
+                $gw->dtime=0;
+                $gw->rtp_forward=true;
+        }
+        // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['description'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Destination"),
+        '#default_value' => $gw->description,
+        '#maxlength' => 128,
+        '#required' => true,
+        );
+    $form['priority'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Priority"),
+        '#default_value' => $gw->priority,
+        '#maxlength' => 10,
+        '#required' => true,
+        );
+    $form['prefix'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Tech Prefix"),
+        '#default_value' => $gw->prefix,
+        '#maxlength' => 20,
+        '#required' => false,
+        );
+//	nrdigcut 	poscut
+
+    $form['poscut'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Remove Digit From"),
+        '#default_value' => $gw->poscut,
+        '#maxlength' => 3,
+        '#required' => false,
+        );
+
+    $form['nrdigcut'] = array(
+        '#type' => 'textfield',
+        '#title' => t("N Digit"),
+        '#default_value' => $gw->nrdigcut,
+        '#maxlength' => 3,
+        '#required' => false,
+        );
+    $protocol[1] = "SIP";
+    $protocol[2] = "H323";
+    $protocol[3] = "SIP&H323";
+    $protocol[4] = "IAX2";
+    $form['protocol'] = array(
+        '#title' => t("Protocol"),
+        '#type' => 'select',
+        '#options' => $protocol,
+        '#default_value' => $gw->protocol,   
+        );
+    $form['ip'] = array(
+        '#type' => 'textfield',
+        '#title' => t("ip"),
+        '#default_value' => $gw->ip,
+        '#maxlength' => 64,
+        '#required' => true,
+        );
+    $form['port'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Port"),
+        '#default_value' => $gw->port,
+        '#maxlength' => 10,
+        '#required' => true,
+        );
+    $rtp[1] = "Forward";
+    $rtp[2] = "Proxy";
+    $d_rtp = ($gw->rtp_forward) ? 1 : 2;
+    $form['rtp_forward'] = array(
+        '#type' => 'select',
+        '#title' => t("RTP"),
+        '#default_value' => $d_rtp,
+        '#options' => $rtp,
+        '#required' => true,
+        );
+    $form['formats'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Codec"),
+        '#default_value' => $gw->formats,
+        '#maxlength' => 64,
+        '#required' => true,
+        );
+    $form['maxport'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Maximum Port"),
+        '#default_value' => $gw->maxport,
+        '#maxlength' => 24,
+        '#required' => true,
+        );
+    $form['min_asr'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Minimum ASR"),
+        '#default_value' => $gw->min_asr,
+        '#maxlength' => 24,
+        '#required' => true,
+        );
+
+    $atimelist = _ws_timebaselist();
+    $atimelist[0] = "All";
+    $form['atime'] = array(
+        '#title' => t("Allow Time base"),
+        '#type' => 'select',
+        '#options' => $atimelist,
+        '#default_value' => $gw->atime,   
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+        );
+    $dtimelist = _ws_timebaselist();
+    $dtimelist[0] = "None";
+    $form['dtime'] = array(
+        '#title' => t("Deny Time base"),
+        '#type' => 'select',
+        '#options' => $dtimelist,
+        '#default_value' => $gw->dtime,   
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+        );
+
+    $zones = _ws_zonelist();
+    $form['tz'] = array(
+        '#title' => t("Time Zone"),
+        '#type' => 'select',
+        '#options' => $zones,
+        '#default_value' => $gw->tz,   
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+        );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+        );
+
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/ 
+function provider_gateway_form_submit($form, &$form_state) {
+    //print_r($form);
+    //return;
+        	$form_state['values']['cutbool'] = 'false';
+            if (($form_state['values']['poscut'] > 0) AND ($form_state['values']['nrdigcut'] > 0)) {
+        	$form_state['values']['cutbool'] = 'true';
+    if ($form_state['values']['id']) {
+            $id = $form_state['values']['id'];
+            //nrdigcut 	poscut
+            
+            };
+            db_query("UPDATE y_routes SET description = '%s',priority=%d,prefix='%s',ip='%s',port='%s',
+                protocol=%d,formats='%s',maxport=%d,atime=%d,dtime=%d,tz=%d,min_asr=%d,cutbool=%s,
+                nrdigcut=%d,poscut=%d 
+                WHERE id = %d", 
+                $form_state['values']['description'],$form_state['values']['priority'],
+                $form_state['values']['prefix'],$form_state['values']['ip'],
+                $form_state['values']['port'],$form_state['values']['protocol'],
+                $form_state['values']['formats'],$form_state['values']['maxport'],
+                $form_state['values']['atime'],$form_state['values']['dtime'],
+                $form_state['values']['tz'],$form_state['values']['min_asr'],
+                $form_state['values']['cutbool'] ,
+                $form_state['values']['nrdigcut'],
+                $form_state['values']['poscut'],
+                $form_state['values']['id']);
+            drupal_set_message("Gateway  '".$form_state['values'][description]."' has been saved.");
+        }
+        else {
+            $ck_gw = db_fetch_object(db_query("SELECT * from y_routes WHERE provider_id = '%d' and ip = '%s' ", $form_state['values']['provider_id'],$form_state['values']['ip']));
+            if ($ck_gw) {
+                    drupal_set_message("Found Gateway <strong>'$ck_gw->ip'</strong> Can't Create.");
+                    drupal_goto('weos/provider/gateway');
+                }
+            db_query("INSERT INTO y_routes(description,priority,prefix,ip,port,protocol,formats,maxport,atime,dtime,tz,provider_id,min_asr
+                ,cutbool,nrdigcut,poscut)
+                Values('%s','%s','%s','%s','%s',%d,'%s',%d,%d,%d,%d,%d,%d,%s,%d,%d)", 
+                $form_state['values']['description'],$form_state['values']['priority'],
+                $form_state['values']['prefix'],$form_state['values']['ip'],
+                $form_state['values']['port'],$form_state['values']['protocol'],
+                $form_state['values']['formats'],$form_state['values']['maxport'],
+                $form_state['values']['atime'],$form_state['values']['dtime'],
+                $form_state['values']['tz'],$form_state['values']['provider_id'],$form_state['values']['min_asr'],
+                $form_state['values']['cutbool'] ,
+                $form_state['values']['nrdigcut'],
+                $form_state['values']['poscut']
+                );
+            drupal_set_message("Gateway  '".$form_state['values'][description]."' has been Created.");
+        }
+    drupal_goto('weos/provider/gateway');
+}
+
+/**
+* Delete bookmark page
+*/
+function provider_gateway_delete_confirm($form_state,$id = NULL) {
+    $gw = db_fetch_object(db_query("SELECT * from y_routes WHERE id = %d", $id));
+
+    if (!$gw) {
+            drupal_goto('weos/provider/gateway');
+        }
+
+    $form['id'] = array('#type' => 'value', '#value' => $gw->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $gw->ip)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/provider/gateway',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+        );
+}
+
+function provider_gateway_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM y_routes WHERE id = %d", $form_state['values']['id']);
+            drupal_goto('weos/provider/gateway');
+        }
+}
+
+
+
+function provider_group_form_overview() {
+    if (empty($_SESSION['provider_group_search_filter'])) {
+            $_SESSION['provider_group_search_filter'] = '';
+        }
+
+    $form['search'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Search',
+        '#size' => 20,
+        '#default_value' => $_SESSION['provider_group_search_filter']
+        );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+function provider_group_overview() {
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('provider_group_form_overview');
+
+    $header = array(
+        array('data' => t('Group'), 'field' => 'provider'),
+        array('data' => t('Operations')),
+        );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['provider_group_search_filter'];
+    $sql = " select * from  voip_providers ";
+    $sql_count = "select count(id) from  voip_providers";
+
+    if ($search_str != '') {
+            //$sql .= " WHERE upper(voip_providers.provider) LIKE upper('$search_str%') ";
+            //$sql_count .= " WHERE upper(voip_providers.provider) LIKE upper('$search_str%') ";
+	    $sql .= " WHERE voip_providers.provider LIKE '$search_str%' ";
+            $sql_count .= " WHERE voip_providers.provider LIKE '$search_str%' ";
+            };
+        //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+            $rows[] = 
+                array(
+                // Cells
+                $rate->provider,
+                	l('Edit','weos/provider/group_edit/'.$rate->id)." ".l('Delete','weos/provider/group_delete/'.$rate->id),
+                );
+        }
+
+    if (!$rows) {
+            $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+        }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+/**
+* Implementation of hook_cron().
+*
+* Remove expired log messages and flood control events.
+*/
+function provider_cron() {
+//  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+//  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+* Implementation of hook_user().
+*/
+function provider_user($op, &$edit, &$user) {
+    if ($op == 'delete') {
+            db_query('UPDATE {watchdog} SET uid = 0 WHERE uid = %d', $user->uid);
+        }
+}
+
+function provider_group_select_form_overview() {
+    if (empty($_SESSION['provider_overview_filter'])) {
+            $_SESSION['provider_overview_filter'] = '0';
+        }
+
+    $types = array();
+
+    $names[0] = "All";
+    $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+    while ($object = db_fetch_object($result)) {
+            $names[$object->id] = $object->provider;
+        }
+    $form['filter'] = array(
+        '#type' => 'select',
+        '#title' => t('Filter by Provider'),
+        '#options' => $names,
+        '#default_value' => $_SESSION['provider_overview_filter']
+        );
+    return $form;
+}
+
+function provider_form_overview() {
+/*
+$filters['status'] = array('title' => t('status'),
+'options' => array('status-1'   => t('published'),     'status-0' => t('not published'),
+'promote-1'  => t('promoted'),      'promote-0' => t('not promoted'),
+'sticky-1'   => t('sticky'),        'sticky-0' => t('not sticky')));
+$filters['type'] = array('title' => t('type'), 'options' => node_get_types('names'));
+*/
+
+
+    if (empty($_SESSION['provider_overview_filter'])) {
+            $_SESSION['provider_overview_filter'] = '0';
+        }
+    if (empty($_SESSION['provider_search_filter'])) {
+            $_SESSION['provider_search_filter'] = '';
+        }
+
+    $types = array();
+
+    $names[0] = "All";
+    $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+    while ($object = db_fetch_object($result)) {
+            $names[$object->id] = $object->provider;
+        }
+    $form['filter'] = array(
+        '#type' => 'select',
+        '#title' => t('Filter by Provider'),
+        '#options' => $names,
+        '#default_value' => $_SESSION['provider_overview_filter']
+        );
+
+    $form['search'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Search',
+        '#size' => 20,
+        '#default_value' => $_SESSION['provider_search_filter']
+        );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+
+/**
+* Menu callback; displays a listing of log messages.
+*/
+function provider_overview() {
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('provider_form_overview');
+
+    $header = array(
+        array('data' => t('Destination'), 'field' => 'description'),
+        array('data' => t('Prefix'), 'field' => 'prefix'),
+        array('data' => t('Price'), 'field' => 'price'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+        array('data' => t('Provider'), 'field' => 'provider'),
+        array('data' => t('ASR'), 'field' => 'asr'),
+        array('data' => t('ACD'), 'field' => 'acd'),
+        array('data' => t('Calls'), 'field' => 'total_call'),
+        array('data' => t('Mins'), 'field' => 'total_min'),
+        array('data' => t('Operations'))
+        );
+
+    $tablesort = tablesort_sql($header);
+    $type = $_SESSION['provider_overview_filter'];
+    $search_str = $_SESSION['provider_search_filter'];
+    $sql = "
+        SELECT 
+	       CASE 
+	          WHEN success_call + fail_call  > 0 THEN (success_call/(fail_call+success_call)::float)*100
+	       ELSE '0'
+	       END As asr, 
+	       CASE 
+	          WHEN success_call > 0 THEN total_sec/(success_call * 60)::float
+	       ELSE '0'
+	       END As acd, 
+	       
+	       total_sec/60 As total_min,success_call + fail_call As total_call,voip_prates.id,prefix,description,price,currencysym,initialincrement,regularincrement,graceperiod,voip_providers.provider
+        FROM voip_prates 
+        LEFT JOIN voip_providers ON voip_prates.provider_id = voip_providers.id 
+        ";
+    $sql_count = "select count(id) from voip_prates";
+    if ($type != '0') {
+            $sql .= " WHERE provider_id = $type ";
+            $sql_count .= " WHERE provider_id = $type ";
+        }else{
+            $sql .= " WHERE 0=0 ";
+            $sql_count .= " WHERE 0=0 ";
+        
+        }
+    if ($search_str != '') {
+            //$sql .= " AND upper(description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+            //$sql_count .= " AND upper(description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+	    $sql .= " AND description LIKE '$search_str%' Or prefix LIKE '$search_str%'";
+            $sql_count .= " AND description LIKE '$search_str%' Or prefix LIKE '$search_str%'";
+            };
+        //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+            $rows[] =  array(
+                // Cells
+                $rate->description,
+                $rate->prefix,
+                $rate->price,
+                $rate->currencysym,
+                $rate->provider,
+                sprintf("%01.2f", $rate->asr),
+                sprintf("%01.2f", $rate->acd),
+                $rate->total_call,
+                $rate->total_min,
+                l('Edit','weos/provider/edit/'.$rate->id).' '.l('Delete','weos/provider/delete/'.$rate->id),
+                );
+        }
+
+    if (!$rows) {
+            $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 12));
+        }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+function provider_form_overview_submit($form, &$form_state) {
+    $_SESSION['provider_overview_filter'] = $form_state['values']['filter'];
+    $_SESSION['provider_search_filter'] = $form_state['values']['search'];
+}
+
+function provider_group_form_overview_submit($form, &$form_state) {
+    $_SESSION['provider_group_search_filter'] = $form_state['values']['search'];
+}
+
+function provider_form($form_state = array(),$id = NULL) {
+    if ($id) {
+            $result = db_query("SELECT * FROM voip_prates WHERE id = %d", $id);
+            $rate = db_fetch_object($result);
+            if (!$rate) {
+                    return drupal_goto('weos/provider');
+                }
+        
+            $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+                );
+        }else{
+            $types = array();
+            $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+            while ($object = db_fetch_object($result)) {
+                    $names[$object->id] = $object->provider;
+                }
+            $form['provider_id'] = array(
+                '#type' => 'select',
+                '#title' => t('Provider'),
+                '#options' => $names,
+                '#default_value' => $_SESSION['provider_overview_filter']
+                );
+        
+        }
+        // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['description'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Destination"),
+        '#default_value' => $rate->description,
+        '#maxlength' => 255,
+        '#required' => true,
+        );
+
+    $form['prefix'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Prefix"),
+        '#default_value' => $rate->prefix,
+        '#required' => true,
+        );
+
+    $form['price'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Value"),
+        '#default_value' => $rate->price,
+        '#required' => true,
+        );
+
+
+    $form['currencysym'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Currency"),
+        '#default_value' => $rate->currencysym,
+        '#required' => true,
+        );
+
+    $form['initialincrement'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Initial Increment"),
+        '#default_value' => $rate->initialincrement,
+        '#required' => true,
+        );
+
+    $form['regularincrement'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Regular Increment"),
+        '#default_value' => $rate->regularincrement,
+        '#required' => true,
+        );
+
+    $form['graceperiod'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Grace Period"),
+        '#default_value' => $rate->graceperiod,
+        '#required' => true,
+        );
+
+    $atimelist = _ws_timebaselist();
+    $atimelist[0] = "All";
+    $form['atime'] = array(
+        '#title' => t("Allow Time base"),
+        '#type' => 'select',
+        '#options' => $atimelist,
+        '#default_value' => $rate->atime,   
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+        );
+    $dtimelist = _ws_timebaselist();
+    $dtimelist[0] = "None";
+    $form['dtime'] = array(
+        '#title' => t("Deny Time base"),
+        '#type' => 'select',
+        '#options' => $dtimelist,
+        '#default_value' => $rate->dtime,   
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+        );
+        
+        
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+        );
+
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/
+function provider_form_submit($form, &$form_state) {
+    if ($form_state['values']['id']) {
+            $id = $form_state['values']['id'];
+            db_query("UPDATE voip_prates SET description = '%s', prefix = '%s', price = %f
+                , currencysym = '%s',initialincrement = %d, regularincrement = %d, graceperiod = %d  
+              ,atime = %d,dtime = %d  WHERE id = %d", 
+                $form_state['values']['description'], $form_state['values']['prefix'],
+                $form_state['values']['price'], $form_state['values']['currencysym']
+                , $form_state['values']['initialincrement'], $form_state['values']['regularincrement'],
+                $form_state['values']['graceperiod']
+                ,$form_state['values']['atime'],$form_state['values']['dtime'], $form_state['values']['id']);
+            drupal_set_message("Provider  '".$form_state['values'][description]."' has been saved.");
+        }
+        else {
+            db_query("INSERT INTO voip_prates(description,prefix,price,currencysym,initialincrement,regularincrement,graceperiod,provider_id,atime,dtime)
+                Values('%s','%s',%f,'%s',%d,%d,%d,%d,%d,%d)", 
+                $form_state['values']['description'], $form_state['values']['prefix'],
+                $form_state['values']['price'], $form_state['values']['currencysym']
+                , $form_state['values']['initialincrement'], $form_state['values']['regularincrement'],
+                $form_state['values']['graceperiod'],$form_state['values']['provider_id'],
+                $form_state['values']['atime'],$form_state['values']['dtime']);
+            drupal_set_message("Prefix  '".$form_state['values'][prefix]."' has been Created.");
+        }
+    drupal_goto('weos/provider');
+}
+
+/**
+* Delete bookmark page
+*/
+function provider_lot_delete_confirm($form_state,$id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from rate WHERE id = %d", $id));
+
+    if (!$rate) {
+            drupal_goto('weos/card/lot');
+        }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $rate->brand)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/card/lot',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+        );
+}
+
+function provider_lot_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM voip_prates WHERE id = %d", $form_state['values']['id']);
+            drupal_goto('weos/card/lot');
+        }
+}
+
+
+function provider_group_form($form_state,$id = NULL) {
+    if ($id) {
+            $result = db_query("SELECT * FROM voip_providers WHERE id = %d", $id);
+            $rate = db_fetch_object($result);
+            if (!$rate) {
+                    return drupal_goto('weos/provider/group');
+                }
+
+            $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+                );
+        }
+
+        // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['description'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Destination"),
+        '#default_value' => $rate->provider,
+        '#maxlength' => 255,
+        '#required' => true,
+        );
+
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+        );
+
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/
+function provider_group_form_submit($form, &$form_state) {
+    if ($form_state['values']['id']) {
+            $id = $form_state['values']['id'];
+            db_query("UPDATE voip_providers SET provider = '%s'  WHERE id = %d",
+                $form_state['values']['description'], $form_state['values']['id']);
+            drupal_set_message("Provider Group '".$form_state['values'][description]."' has been saved.");
+        }
+        else {
+            db_query("INSERT into voip_providers(provider) Values('%s')", $form_state['values']['description']);
+            drupal_set_message("Provider group  '".$form_state['values'][description]."' has been Created.");
+        }
+    drupal_goto('weos/provider/group');
+}
+
+/**
+* Delete bookmark page
+*/
+function provider_group_delete_confirm($form_state,$id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from voip_providers WHERE id = %d", $id));
+
+    if (!$rate) {
+            drupal_goto('weos/provider/group');
+        }
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %description?', array('%description' => $rate->provider)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/provider/group',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+        );
+}
+
+function provider_group_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM voip_prates WHERE provider_id = %d", $form_state['values']['id']);
+            db_query("DELETE FROM voip_providers WHERE id = %d", $form_state['values']['id']);
+            drupal_goto('weos/provider/group');
+        }
+}
+
+function provider_delete_confirm($form_state ,$id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from voip_prates WHERE id = %d", $id));
+
+    if (!$rate) {
+            drupal_goto('weos/provider/list');
+        }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %description?', array('%description' => $rate->description)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/provider/group',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+        );
+}
+
+function provider_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM voip_prates WHERE id = %d", $form_state['values']['id']);
+            drupal_goto('weos/provider/list');
+        }
+}
+
+function provider_test(){
+    if ($x==0){
+            $c=1;
+        
+        }else{
+            $c=2;
+        }
+
+};
+

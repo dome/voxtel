@@ -1,0 +1,448 @@
+/*
+ * Asterisk -- An open source telephony toolkit.
+ *
+ * Javascript routines or accessing manager routines over HTTP.
+ *
+ * Copyright (C) 1999 - 2006, Digium, Inc.
+ *
+ * Mark Spencer <markster@digium.com>
+ *
+ * See http://www.asterisk.org for more information about
+ * the Asterisk project. Please do not directly contact
+ * any of the maintainers of this project for assistance;
+ * the project provides a web site, mailing lists and IRC
+ * channels for your use.
+ *
+ * This program is free software, distributed under the terms of
+ * the GNU General Public License Version 2. See the LICENSE file
+ * at the top of the source tree.
+ *
+ */
+
+
+
+function Astman() {
+	var me = this;
+	var channels = new Array;
+	var lastselect;
+	var selecttarget;
+	this.setURL = function(url) {
+		this.url = url;
+	};
+	this.setEventCallback = function(callback) {
+		this.eventcallback = callback;
+	};
+	this.setDebug = function(debug) {
+		this.debug = debug;
+	};
+	this.getvar = function ()
+	{
+	    var vars = [], hash;
+    	    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+        
+            for(var i = 0; i < hashes.length; i++)
+                {
+                    hash = hashes[i].split('=');
+                    vars.push(hash[0]);
+                    vars[hash[0]] = hash[1];
+                }
+            return vars;
+        };
+	this.clickChannel = function(ev) {
+		var target = ev.target;
+		// XXX This is icky, we statically use astmanEngine to call the callback XXX 
+		if (me.selecttarget)
+			me.restoreTarget(me.selecttarget);
+		while(!target.id || !target.id.length)
+			target=target.parentNode;
+		me.selecttarget = target.id;
+		target.className = "chanlistselected";
+		me.chancallback(target.id);
+	};
+	this.restoreTarget = function(targetname) {
+		var other;
+		target = $$$(targetname);
+		if (!target)
+			return;
+		if (target.previousSibling) {
+			other = target.previousSibling.previousSibling.className;
+		} else if (target.nextSibling) {
+			other = target.nextSibling.nextSibling.className;
+		}
+		if (other) {
+			if (other == "chanlisteven") 
+				target.className = "chanlistodd";
+			else
+				target.className = "chanlisteven";
+		} else
+				target.className = "chanlistodd";
+	};
+	this.channelUpdate = function(msg, channame) {
+		var fields = new Array("callerid", "calleridname", "context", "extension", "priority", "account", "state", "link", "uniqueid" );
+
+		if (!channame || !channame.length)
+			channame = msg.headers['channel'];
+
+		if (!channels[channame])
+			channels[channame] = new Array();
+			
+		if (msg.headers.event) {
+			if (msg.headers.event == "Hangup") {
+				delete channels[channame];
+			} else if (msg.headers.event == "Link") {
+				var chan1 = msg.headers.channel1;
+				var chan2 = msg.headers.channel2;
+				if (chan1 && channels[chan1])
+					channels[chan1].link = chan2;
+				if (chan2 && channels[chan2])
+					channels[chan2].link = chan1;
+			} else if (msg.headers.event == "Unlink") {
+				var chan1 = msg.headers.channel1;
+				var chan2 = msg.headers.channel2;
+				if (chan1 && channels[chan1])
+					delete channels[chan1].link;
+				if (chan2 && channels[chan2])
+					delete channels[chan2].link;
+			} else if (msg.headers.event == "Rename") {
+				var oldname = msg.headers.oldname;
+				var newname = msg.headers.newname;
+				if (oldname && channels[oldname]) {
+					channels[newname] = channels[oldname];
+					delete channels[oldname];
+				}
+			} else {
+				channels[channame]['channel'] = channame;
+				for (x=0;x<fields.length;x++) {
+					if (msg.headers[fields[x]])
+						channels[channame][fields[x]] = msg.headers[fields[x]];
+				}
+			}
+		} else {
+			channels[channame]['channel'] = channame;
+			for (x=0;x<fields.length;x++) {
+				if (msg.headers[fields[x]])
+					channels[channame][fields[x]] = msg.headers[fields[x]];
+			}
+		}
+	};
+	this.channelClear = function() {
+		channels = new Array;
+	}
+	this.channelInfo = function(channame) {
+		return channels[channame];
+	};
+	this.channelTable = function(callback) {
+		var s, x;
+		var cclass, count=0;
+		var found = 0;
+		var foundactive = 0;
+		var fieldlist = new Array("callerid");
+
+		me.chancallback = callback;
+		s = "<table class='chantable' align='center'>\n";
+		count=0;
+		for (x in channels) {
+			var hash = me.getvar();
+			//alert(hash['number']); 
+			//if (channels[x].channel && channels[x].extension==hash['number']) {
+			if (channels[x].channel) {
+				if (count % 2)
+					cclass = "chanlistodd";
+				else
+					cclass = "chanlisteven";
+				if (me.selecttarget && (me.selecttarget == x)) {
+					cclass = "chanlistselected";
+					foundactive = 1;
+				}
+				count++;
+				s = s + "\t<tr class='" + cclass + "' id='" + channels[x].channel + "' onClick='astmanEngine.clickChannel(event)'>";
+				if (channels[x].callerid) {
+					//cid = channels[x].calleridname.escapeHTML() + " &lt;" + channels[x].callerid.escapeHTML() + "&gt;";
+					cid = channels[x].callerid.escapeHTML();
+//				} else if (channels[x].calleridname && (channels[x].calleridname != "<unknown>")) {
+//					cid = channels[x].calleridname.escapeHTML();
+//				} else if (channels[x].callerid) {
+//					cid = channels[x].callerid.escapeHTML();
+				} else {
+					cid = "<i class='light'>Unknown</i>";
+//					cid = channels[x].extension.escapeHTML();
+				}
+				s = s + "<td>" + cid + "</td>";
+				s = s + "</tr>\n";
+				found++;
+			}
+		}
+		if (!found)
+			s += "<tr><td colspan=" + fieldlist.length + "><i class='light'>No active channels</i></td>\n";
+		s += "</table>\n";
+		if (!foundactive) {
+			me.selecttarget = null;
+		}
+		return s;
+	};
+	this.parseResponse = function(t, callback) {
+		var msgs = new Array();
+		var inmsg = 0;
+		var msgnum = 0;
+		var x,y;
+		var s = t.responseText;
+		var allheaders = s.split('\r\n');
+		if (me.debug) 
+			me.debug.value = "\n";
+		for (x=0;x<allheaders.length;x++) {
+			if (allheaders[x].length) {
+				var fields = allheaders[x].split(': ');
+				if (!inmsg) {
+					msgs[msgnum] = new Object();
+					msgs[msgnum].headers = new Array();
+					msgs[msgnum].names = new Array();
+					y=0;
+				}
+				msgs[msgnum].headers[fields[0].toLowerCase()] = fields[1];
+				msgs[msgnum].names[y++] = fields[0].toLowerCase();
+				if (me.debug)
+					me.debug.value = me.debug.value + "field " + fields[0] + "/" + fields[1] + "\n";
+				inmsg=1;
+			} else {
+				if (inmsg) {
+					if (me.debug)
+						me.debug.value = me.debug.value + " new message\n";
+					inmsg = 0;
+					msgnum++;
+				}
+			}
+		}
+		if (me.debug) {
+			me.debug.value = me.debug.value + "msgnum is " + msgnum + " and array length is " + msgs.length + "\n";
+			me.debug.value = me.debug.value + "length is " + msgs.length + "\n";
+			var x, y;
+			for (x=0;x<msgs.length;x++) {
+				for (y=0;y<msgs[x].names.length;y++)  {
+					me.debug.value = me.debug.value + "msg "+ (x + 1) + "/" + msgs[x].names[y] + "/" + msgs[x].headers[msgs[x].names[y]] + "\n";
+				}
+			}
+		}
+		callback(msgs);
+	};
+	this.managerResponse = function(t) {
+		me.parseResponse(t, me.callback);
+	};
+	this.doEvents = function(msgs) {
+		me.eventcallback(msgs);
+	};
+	this.eventResponse = function(t) {
+		me.parseResponse(t, me.doEvents);
+	};
+	this.sendRequest = function(request, callback) {
+		var tmp;
+		var opt = {
+			method: 'get',
+			asynchronous: true,
+			onSuccess: this.managerResponse,
+			onFailure: function(t) {
+				alert("Error: " + t.status + ": " + t.statusText);
+			}
+		};
+		me.callback = callback;
+		opt.parameters = request;
+		tmp = new Ajax.Request(this.url, opt);
+	};
+	this.pollEvents = function() {
+		var tmp;
+		var opt = {
+			method: 'get',
+			asynchronous: true,
+			onSuccess: this.eventResponse,
+			onFailure: function(t) {
+				alert("Event Error: " + t.status + ": " + t.statusText);
+			}
+		};
+		opt.parameters="action=waitevent";
+		tmp = new Ajax.Request(this.url, opt);
+	};
+};
+	var logins = new Object;
+	var logoffs = new Object;
+	var channels = new Object;
+	var pongs = new Object;
+	var loggedon = -1;
+	var selectedchan = null;
+	var hungupchan = "";
+	var transferedchan = "";
+	
+	var demo = new Object;
+	function loggedOn() {
+		if (loggedon == 1)
+			return;
+		loggedon = 1;
+		//updateButtons();
+		document.getElementById('statusbar').innerHTML = "<i>Retrieving channel status...</i>";
+		astmanEngine.pollEvents();
+		astmanEngine.sendRequest('action=status', demo.channels);
+	}
+	
+	function clearChannelList() {
+		document.getElementById('channellist').innerHTML = "<i class='light'>Not connected</i>";
+	}
+
+	function loggedOff() {
+		if (loggedon == 0)
+			return;
+		loggedon = 0;
+		selectedchan = null;
+		//updateButtons();
+		astmanEngine.channelClear();
+	 	//clearChannelList();
+		//alert('dddd');
+	}
+	
+	function updateButtons()
+	{
+		if (document.getElementById(selectedchan)) {
+			document.getElementById('transfer').disabled = 0;
+			document.getElementById('hangup').disabled = 0;
+		} else {
+			document.getElementById('transfer').disabled = 1;
+			document.getElementById('hangup').disabled = 1;
+			selectedchan = null;
+		}
+		if (loggedon) {
+			document.getElementById('username').disabled = 1;
+			document.getElementById('secret').disabled = 1;
+			document.getElementById('logoff').disabled = 0;
+			document.getElementById('login').disabled = 1;
+			document.getElementById('refresh').disabled = 0;
+		} else {
+			document.getElementById('username').disabled = 0;
+			document.getElementById('secret').disabled = 0;
+			document.getElementById('logoff').disabled = 1;
+			document.getElementById('login').disabled = 0;
+			document.getElementById('refresh').disabled = 1;
+		}
+	}
+	
+	demo.channelCallback = function(target) {
+		selectedchan = target;
+		updateButtons();
+	}
+	
+	demo.channels = function(msgs) {
+		resp = msgs[0].headers['response'];
+		if (resp == "Success") {
+			loggedOn();
+		} else
+			loggedOff();
+
+		for (i=1;i<msgs.length - 1;i++) 
+			astmanEngine.channelUpdate(msgs[i]);
+		jsvar = document.tuxform.tuser.value;
+		document.getElementById('channellist').innerHTML = astmanEngine.channelTable(demo.channelCallback);
+		document.getElementById('statusbar').innerHTML = "Ready :"+jsvar;
+	}
+
+	demo.logins = function(msgs) {
+		//alert('asdasd');
+		document.getElementById('statusbar').innerHTML = msgs[0].headers['message'];
+		resp = msgs[0].headers['response'];
+		if (resp == "Success")
+			loggedOn();
+		else
+			loggedOff();
+	};
+	
+	
+	demo.logoffs = function(msgs) {
+		document.getElementById('statusbar').innerHTML = msgs[0].headers['message'];
+		loggedOff();
+	};
+
+	demo.hungup = function(msgs) {
+		document.getElementById('statusbar').innerHTML = "Hungup " + hungupchan;
+	}
+	
+	demo.transferred = function(msgs) {
+		document.getElementById('statusbar').innerHTML = "Transferred " + transferredchan;
+	}
+
+	function doHangup() {
+		hungupchan = selectedchan;
+		astmanEngine.sendRequest('action=hangup&channel=' + selectedchan, demo.hungup);
+	}
+
+	function doStatus() {
+		document.getElementById('statusbar').innerHTML = "<i>Updating channel status...</i>";
+		astmanEngine.channelClear();
+		astmanEngine.sendRequest('action=status', demo.channels);
+	}	
+		
+	function doLogin() {
+	        //document.getElementById('statusbar').innerHTML = "<i>xxx Please login...</i>";
+		//document.getElementById('statusbar').innerHTML = "<i>Logging in...</i>";
+		//document.getElementById('statusbar').innerHTML = "<i>xxxxxx Logging in...</i>";
+		//astmanEngine.sendRequest('action=login&username=' + document.getElementById('username').value + "&secret=" + document.getElementById('secret').value, demo.logins);
+		astmanEngine.sendRequest('action=login&username=manager&secret=pass', demo.logins);
+	}
+	
+	function doTransfer() {
+		var channel = astmanEngine.channelInfo(selectedchan);
+		var exten = prompt("Enter new extension for " + selectedchan);
+		var altchan;
+		if (exten) {
+			if (channel.link) {
+				if (confirm("Transfer " + channel.link + " too?"))
+					altchan = channel.link;
+			}
+			if (altchan) {
+				transferredchan = selectedchan + " and " + altchan + " to " + exten;
+				astmanEngine.sendRequest('action=redirect&channel=' + selectedchan + "&priority=1&extrachannel=" + altchan + "&exten=" + exten, demo.transferred);
+			} else {
+				transferredchan = selectedchan + " to " + exten;
+				astmanEngine.sendRequest('action=redirect&channel=' + selectedchan + "&priority=1&exten=" + exten, demo.transferred);
+			}
+		}
+	}
+	
+	function doLogoff() {
+		document.getElementById('statusbar').innerHTML = "<i>Logging off...</i>";
+		astmanEngine.sendRequest('action=logoff', demo.logoffs);
+	}
+	
+	demo.pongs  = function(msgs) {
+		resp = msgs[0].headers['response'];
+		if (resp == "Pong") {
+			document.getElementById('statusbar').innerHTML = "<i>Already connected...</i>";
+			loggedOn();
+		} else {
+			document.getElementById('statusbar').innerHTML = "<i>Please login...</i>";
+			loggedOff();
+		}
+	}
+	
+	demo.eventcb = function(msgs) {
+		var x;
+		if (loggedon) {
+			for (i=1;i<msgs.length - 1;i++) {
+				astmanEngine.channelUpdate(msgs[i]);
+			}
+			document.getElementById('channellist').innerHTML = astmanEngine.channelTable(demo.channelCallback);
+			astmanEngine.pollEvents();
+		}
+		updateButtons();
+	}
+	
+	function localajaminit() {
+		astmanEngine.setURL('/aj/rawman');
+		astmanEngine.setEventCallback(demo.eventcb);
+		//astmanEngine.setDebug(document.getElementById('ditto'));
+		//clearChannelList();
+		astmanEngine.sendRequest('action=ping', demo.pongs);
+	}
+
+astmanEngine = new Astman();
+localajaminit();
+doLogin();
+//	alert('asdadsasd');
+
+
+//astmanEngine = new Astman();
+

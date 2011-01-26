@@ -1,0 +1,43 @@
+<?php
+define('SINGLE_LOGIN_MSG_BLOCKED', 'single_login_msg_blocked');
+define('SINGLE_LOGIN_DEF_BLOCKED', 'You reached maximal relogin count. Your account was blocked. Please contact site administrator.');
+
+function tlogin_menu() {
+  $items = array();
+  $items['tlogin-blocked'] = array(
+    'title' => t('Account was blocked'),
+    'page callback' => 'tlogin_static_page',
+    'page arguments' => array('blocked'),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+function tlogin_static_page($op) {
+  switch ($op) {
+    case 'blocked':
+      return variable_get(SINGLE_LOGIN_MSG_BLOCKED, SINGLE_LOGIN_DEF_BLOCKED);
+    default:
+      drupal_goto();
+  }
+}
+
+function tlogin_user($op, &$edit, &$account, $category = NULL) {
+  global $user;
+      //echo $op;    
+      switch ($op) {
+          case 'login':
+    		$sql = "SELECT count(1) as counter FROM {sessions} WHERE uid = %d";
+                $res = db_query($sql, $account->uid);
+                $ck_login = (($row = db_fetch_object($res)) === false) ? 0 : $row->counter;
+                if ($ck_login >1){
+                  $_REQUEST['destination'] = 'tlogin-blocked';
+                  //drupal_set_message($account->name." Still Loged in.",'error');
+                  user_logout();
+                };
+            break;
+          case 'logout':
+            break;
+      };	
+};

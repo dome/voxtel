@@ -1,0 +1,58 @@
+<?php
+
+function vrate_menu() {
+	$items = array();
+
+		$items['rate'] = array(
+                'description' => 'Rate System.', 'title' => 'Rate',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vrate_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		
+		$items['rate/autocomplete'] = array(
+    		'title' => 'Autocomplete Rate',
+    		'page callback' => 'vrate_autocomplete',
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK);
+	return $items;
+}
+
+function vrate_form() {
+	$form['rate'] = array(
+	'#type' => 'textfield',
+	'#title' => t("Search (Code Or Country)"),
+//        '#default_value' => isset($rate) ? $rate : '',
+//        '#required' => TRUE,
+        '#size' => 60,
+        '#maxlength' => 64, 
+	'#autocomplete_path' => 'rate/autocomplete/'
+	);
+	return $form;
+}
+
+function vrate_autocomplete($string = '') {
+/*
+  $matches["Thailand"] = "Thailand";
+  $matches[2] = "xczxcThailand";
+  $matches["ccc"] = $string;
+  print drupal_to_js($matches);
+    exit();
+*/
+
+  if ($string != '') {
+    $sql = " SELECT prefix,description,price,currencysym FROM rate_view WHERE grpid=1 AND (upper(description) LIKE '%".strtoupper($string)."%'".
+             "Or prefix LIKE '".$string."%')";
+    $result = pager_query($sql, 50,0);
+    $matches = array();
+    while ($rate = db_fetch_object($result)) {
+      $d = $rate->prefix.' '.$rate->description.'  Rate:'.$rate->price.' '.$rate->currencysym;
+      $matches[$d] = check_plain($d);
+    }
+    print drupal_to_js($matches);
+    exit();
+  }
+}

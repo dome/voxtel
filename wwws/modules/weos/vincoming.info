@@ -1,0 +1,8 @@
+name = Weos Incoming  Module
+description = A weos Incoming module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

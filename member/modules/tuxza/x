@@ -1,0 +1,9 @@
+	$items['reseller/add'] = array(
+        'description' => 'Create Account.','title' => 'Register',
+        'menu_name' => 'features',
+      'weight' => -100,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vstaff_form'),
+      'access arguments' => array('access reseller'),
+      'type' => MENU_LOCAL_TASK
+	);

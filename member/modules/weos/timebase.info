@@ -1,0 +1,7 @@
+name = Weos TimeBase Module
+description = A weos TimeBase module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+core = 6.x

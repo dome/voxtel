@@ -1,0 +1,242 @@
+<?php
+
+function vguest_menu() {
+
+		$items['service'] = array(
+    		'title' => 'TopUp',
+    		'page callback' => 'drupal_get_form',
+                'page arguments' => array('vguest_topup_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+    		);
+
+		$items['sms'] = array(
+                'description' => 'SMS Service.', 'title' => 'SMS Service',
+		'page callback' => 'vguest_sms',
+                'weight' => -1,
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['service/test'] = array(
+                'description' => 'Member Service.', 'title' => 'Test',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vguest_test_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['rate/autocomplete'] = array(
+    		'title' => 'Autocomplete Rate',
+    		'page callback' => 'vguest_autocomplete',
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK);
+/*
+		$items['service'] = array(
+                'description' => 'Member Service.', 
+                'title' => 'TopUp',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('vguest_topup_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['sms'] = array(
+                'description' => 'SMS Service.', 'title' => 'SMS Service',
+		'page callback' => 'vguest_sms',
+                'weight' => -1,
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['service/test'] = array(
+                'description' => 'Member Service.', 'title' => 'Test',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vguest_test_form'),
+		'access arguments' => TRUE,
+    		'type' => MENU_CALLBACK
+		);
+
+		
+		$items['rate/autocomplete'] = array(
+    		'title' => 'Autocomplete Rate',
+    		'page callback' => 'vguest_autocomplete',
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK);
+
+*/        
+	return $items;
+}
+function vguest_sms() {
+   if (isset($_REQUEST["username"])){
+       list($pin, $tonumber) = split(' ', $_REQUEST['pin']);
+       //echo $pin;
+       if (strlen($tonumber)==0)
+            $tonumber = $_REQUEST["username"];
+       watchdog('user', "TopUP From SMS ".$pin." to Account ".$tonumber." By ".$_REQUEST["username"]);
+ 
+  if (strlen($pin) > 0){
+    $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $pin,$tonumber);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$pin." Fail.",'error');
+    }else{
+      if ($card_lot->cpay > 0) {
+	echo "<reply>TopUp From ".$pin.' amount '.$card_lot->cpay." To ".$tonumber." Success.</reply>";
+	die;
+      }else{
+        echo "<reply>TopUp From ".$pin." Fail.</reply>";
+	die;
+      };
+    };  
+
+   };
+   };
+        echo "<reply>TopUp Fail.</reply>";
+	die;
+       
+return;
+};
+//isset($_REQUEST["number"])
+function vguest_test_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function vguest_test_form_submit($form, &$form_state) {
+      drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+      return;
+
+};
+
+function vguest_sms_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+
+function vguest_sms_form_submit($form, &$form_state) {
+  global $user;
+   watchdog('user', "TopUP From SMS '$form[pin]' to Account '$form[username]'");
+  if (strlen($form['pin']) > 0){
+    $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form['pin'],$form['username']);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+    }else{
+      if ($card_lot->cpay > 0) {
+	echo "<reply>TopUp From ".$form['pin'].' amount '.$card_lot->cpay." To ".$form['username']." Success.</reply>";
+	die;
+        //drupal_set_message("TopUp From ".$form['pin'].' amount '.$card_lot->cpay." To ".$form['username']." Success.");
+      }else{
+        echo "<reply>TopUp From ".$form['pin']." Fail.</reply>";
+        //drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+	die;
+      };
+    };  
+  };
+      
+    return;
+}
+
+function vguest_topup_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+
+function vguest_topup_form_submit($form, &$form_state) {
+  global $user;
+  //$form_state['values'][app]
+  if (strlen($form_state['values']['pin']) > 0){
+    $sql = "SELECT card_pay('".$form_state['values']['pin']."','".$form_state['values']['username']."',1) As cpay ;";
+    // drupal_set_message($sql,'error');
+    $result = db_query($sql);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+
+    }else{
+      if ($card_lot->cpay > 0) {
+        drupal_set_message("TopUp From ".$form_state['values']['pin'].' amount '.$card_lot->cpay." To ".$form_state['values']['username']." Success.");
+      }else{
+        drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+      };
+    };  
+  };
+      
+    return;
+}
+
+function vguest_autocomplete($string = '') {
+/*
+  $matches["Thailand"] = "Thailand";
+  $matches[2] = "xczxcThailand";
+  $matches["ccc"] = $string;
+  print drupal_to_js($matches);
+    exit();
+*/
+
+  if ($string != '') {
+    $sql = " SELECT prefix,description,price,currencysym FROM rate_view WHERE grpid=1 AND description LIKE '%".$string."%'".
+             "Or prefix LIKE '".$string."%'";
+    $result = pager_query($sql, 50,0);
+    $matches = array();
+    while ($rate = db_fetch_object($result)) {
+      $d = $rate->prefix.' '.$rate->description.'  Rate:'.$rate->price.' '.$rate->currencysym;
+      $matches[$d] = check_plain($d);
+    }
+    print drupal_to_js($matches);
+    exit();
+  }
+}

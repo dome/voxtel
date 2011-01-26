@@ -1,0 +1,8 @@
+name = TuxZA Single Login
+description = A TuxZA Single Login
+package = TuxZA
+version = "5.0"
+project = "TuxZA"
+
+
+core = 6.x

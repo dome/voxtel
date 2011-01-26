@@ -1,0 +1,7 @@
+name = Weos Rate Module
+description = A weos rate module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+core = 6.x

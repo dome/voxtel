@@ -1,0 +1,8 @@
+name = TuxZa Permission Provider Menu
+description = A TuxZa Permission  Provider Menu
+package = "Weos Premission"
+version = "5.0"
+project = "WeOS Permission"
+
+
+core = 6.x

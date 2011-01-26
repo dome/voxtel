@@ -1,0 +1,168 @@
+<?php
+
+function z_test_menu() {
+   $items['ztest'] = array(
+    'title' => 'Z Test',
+    'menu_name' => 'features',
+    'weight' => 15, 
+    'page callback' => 'z_test_overview',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('Member'),
+    'type' => MENU_NORMAL_ITEM,
+	);
+ $items['ztest/list'] = array(
+    'title' => 'List',
+    'menu_name' => 'features',
+    'weight' => 1, 
+    'page callback' => 'z_test_overview',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('Member'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+	);
+ $items['ztest/edit'] = array(
+     'description' => 'Add Service.',
+     'menu_name' => 'features',
+                'weight' => -1,
+     'title' => 'Add/Edit',
+     'page callback' => 'drupal_get_form',
+     'page arguments' => array('z_test_edit_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK,
+ );
+
+   return $items;
+   	
+
+}
+
+function z_test_search_form_submit($form, &$form_state) {
+	$_SESSION['z_test_search'] = $form_state['values']['search'];
+	$_SESSION['z_test_search_date1'] = $form_state['values']['date1'];
+}
+
+
+function z_test_search_form() {
+   echo  $_SESSION['z_test_search_date1'];
+   
+   if (empty($_SESSION['z_test_search'])) {
+		$_SESSION['z_test_search'] = '';
+   }
+  $format = 'Y-m-d H:i';
+
+  $form['date1'] = array(
+     '#type' => 'date_select', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'Start from',
+     '#default_value' => $_SESSION['vreport_date1_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 15, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '-3:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+  );	
+   
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#default_value' => $_SESSION['z_test_search']
+	);
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Search'));
+	return $form;
+}
+
+function z_test_edit_form($form_state = array(),$uid=NULL) {
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#maxlength' => 10,
+    '#default_value' => $uid,
+    '#required' => true
+	);
+
+	$form['card'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Password"),
+    '#maxlength' => 10,
+    '#required' => true
+	);
+
+    $form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Add',
+	);
+
+	return $form;
+}
+
+
+function z_test_edit_form_validate($form, &$form_state) {
+
+	if (!is_numeric($form_state['values']['username'])){
+		form_set_error('username', 'Only Numeric.');
+	}
+	if (!is_numeric($form_state['values']['card'])){
+		form_set_error('password', 'Only Numeric.');
+	};
+}
+
+function z_test_edit_form_submit($form, &$form_state) {
+        $result = db_query("insert into tlog(username,card) Values('%s','%s')"
+        ,$form_state['values']['username'],$form_state['values']['card']);
+	drupal_set_message(" sasdads.",'error');
+	return drupal_goto('ztest/list');
+	
+};
+
+
+
+function z_test_overview(){
+    $output = drupal_get_form('z_test_search_form');
+    //	acctstarttime calledstationid 	duration 	cost
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'acctstarttime'),
+        array('data' => t('Call to'), 'field' => 'calledstationid'),
+        array('data' => t('Duration'), 'field' => 'duration'),
+    );
+
+    $tablesort = tablesort_sql($header);
+    if (strlen($_SESSION['z_test_search'])==0){
+	$sql = " SELECT * voipcall tlog  ";
+	$sql_count = "select count(username) from voipcall";
+    }else{
+        $searchstr = $_SESSION['z_test_search'];
+        $date1 = $_SESSION['z_test_search_date1'];
+	$sql = " SELECT * from voipcall  Where username Like '$searchstr%' and acctstarttime < timestamp '$date1'";
+	$sql_count = "select count(username) from voipcall Where username Like '$searchstr%' and acctstarttime < timestamp '$date1'";
+	
+    }
+
+    $result = pager_query($sql . $tablesort, 10,0,$sql_count);
+
+    while ($data = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $data->username,
+            $data->acctstarttime,
+            $data->calledstationid,
+            $data->duration,
+            //l('Delete','rate/provider/del/'.$data->id),
+        );
+    }
+
+    if (!$rows) {$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 10, 0);
+
+    return $output;
+
+};
+
+?>

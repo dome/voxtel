@@ -1,0 +1,45 @@
+***************
+*** 126,131 ****
+      'sort' => array(
+        'handler' => 'views_handler_sort',
+      ),
+      'argument' => array(
+        'handler' => 'views_handler_argument_string',
+        'help' => t('Taxonomy term name.'),
+--- 126,135 ----
+      'sort' => array(
+        'handler' => 'views_handler_sort',
+      ),
++     'filter' => array(
++       'handler' => 'views_handler_filter_string',
++       'help' => t('Taxonomy term name.'),
++     ),
+      'argument' => array(
+        'handler' => 'views_handler_argument_string',
+        'help' => t('Taxonomy term name.'),
+***************
+*** 195,200 ****
+      ),
+    );
+  
+    // tid field
+    $data['term_node']['tid'] = array(
+      'title' => t('Term ID'),
+--- 199,215 ----
+      ),
+    );
+  
++   $data['term_node']['vid'] = array(
++     'title' => t('Node'),
++     'help' => t('Relate a term to the node tagged with that term.'),
++     'relationship' => array(
++       'handler' => 'views_handler_relationship',
++       'base' => 'node',
++       'base field' => 'vid',
++       'label' => t('node'),
++     ),
++   );
++ 
+    // tid field
+    $data['term_node']['tid'] = array(
+      'title' => t('Term ID'),

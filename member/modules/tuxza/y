@@ -1,0 +1,53 @@
+function vstaff_form($form_state = array(),$id = NULL) {
+	if ($username) {
+		$result = db_query("SELECT id FROM dr_users  WHERE name = '%s'", $id);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			return drupal_goto('reseller');
+		}
+	}
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Create New Member"),
+    '#maxlength' => 10,
+    '#required' => true,
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+function vstaff_form_validate($form, &$form_state) {
+//	if (!is_numeric($form_state['values']['username'])){
+//		form_set_error('username', 'Only Numeric.');
+//	}
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vstaff_form_submit($form, &$form_state) {
+	global $user;
+	$result = db_query("SELECT create_account_mobile('%s');", $form_state['values']['username']);
+	$card_lot = db_fetch_object($result);
+	if ($card_lot) {
+		if ($card_lot->create_account_mobile > 0 ) {
+			$_SESSION['vstaff_search_filter'] = $form_state['values']['username'];
+			$result = db_query("update dr_users set create_by='%s' where name='%s';",'Agent:'.$user->name, $form_state['values']['username']);
+			//drupal_set_message("Successfull Password is   '$card_lot->create_account_mobile' ");
+			drupal_set_message("Successfull..");
+		}else{
+			drupal_set_message($form_state['values']['username']." has already been taken ");
+			return drupal_goto('reseller/add');
+
+		};
+	}
+	return drupal_goto('reseller/add');
+	//return drupal_goto('reseller/ckuser/'.$form_state['values']['username']);
+}

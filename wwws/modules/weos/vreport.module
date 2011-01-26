@@ -1,0 +1,1194 @@
+<?php
+
+function vreport_perm() {
+	return array('access rate','admin rate');
+}
+
+function vreport_menu() {
+	$items = array();
+
+
+
+
+	$items['report'] = array(
+            'description' => 'View report.', 'title' => 'Report',
+            'menu_name' => 'features',
+            'page callback' => 'vreport_overview',
+            'weight' => -5,
+            'access arguments' => array('access rate'),
+            'type' => MENU_NORMAL_ITEM,
+	);
+
+	$items['report/list'] = array(
+            'description' => 'View report.', 'title' => 'List',
+            'page callback' => 'vreport_overview',
+            'menu_name' => 'features',
+            'weight' => -1,
+            'access arguments' => array('access rate'),
+            'type' => MENU_DEFAULT_LOCAL_TASK
+	);
+	$items['report/provider'] = array(
+            'description' => 'View report.', 'title' => 'Provider Report',
+            'page callback' => 'vreport_provider_overview',
+            'menu_name' => 'features',
+            'weight' => -1,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	$items['report/graph'] = array(
+            'description' => 'Graph.', 'title' => 'Graph',
+            'page callback' => 'vreport_graph_overview',
+            'menu_name' => 'features',
+            'weight' => 6,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	$items['report/summary'] = array(
+            'description' => 'Summary', 'title' => 'Summary',
+            'menu_name' => 'features',
+            'page callback' => 'vreport_sum',
+            'weight' => 7,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	$items['report/top10'] = array(
+            'description' => 'Top 10', 'title' => 'Top 10 Dest',
+            'page callback' => 'vreport_top10',
+            'menu_name' => 'features',
+            'weight' => 7,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	$items['report/top10p'] = array(
+            'description' => 'Summary Provider', 'title' => 'Summary Provider',
+            'page callback' => 'vreport_top10p',
+            'menu_name' => 'features',
+            'weight' => 7,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	$items['report/card'] = array(
+            'description' => 'Card Report', 'title' => 'Card',
+            'page callback' => 'vreport_card',
+            'menu_name' => 'features',
+            'weight' => 7,
+            'access arguments' => array('access rate'),
+            'type' => MENU_LOCAL_TASK
+	);
+	return $items;
+}
+
+function vreport_card() {
+	$output = drupal_get_form('vcard_form_overview');
+	$search_str = $_SESSION['vcard_search_filter'];
+	$card_lot=$_SESSION['vcard_brand_filter'];
+	if ($_SESSION['line_per_page'] > 0)
+	$lpage=$_SESSION['line_per_page'];
+	else
+	$lpage=10;
+
+	$header = array(
+	array('data' => t('Serial'), 'field' => 'serial'),
+	array('data' => t('PIN'), 'field' => 'number'),
+	array('data' => t('Balance'), 'field' => ''),
+	array('data' => t('TopUP Date'), 'field' => 'create_date'),
+	array('data' => t('Topup To'), 'field' => 'ref'),
+	);
+	$tablesort = tablesort_sql($header);
+
+	$sql="select * from vcard  ";
+	$sql_count = "Select count(id) from vcard ";
+	if ($card_lot > 0) {
+		$sql .= "  Where id = $card_lot ";
+		$sql_count .= "  Where id = $card_lot ";
+	}else {
+		//where number LIKE '$search_str%'
+		$sql .= "  where serial LIKE '$search_str%' ";
+		$sql_count .= "  where serial LIKE '$search_str%' ";
+		//return $output;
+
+	}
+
+	$result = pager_query($sql. $tablesort, $lpage, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, $lpage,0, $sql_count);
+	global $memcache;
+	while ($data = db_fetch_object($result)) {
+		$get_result = $memcache->get('serial:'.$data->serial);
+		$obj = json_decode($get_result);
+		$get_result = $memcache->get('card:'.$obj->{'card'});
+		$obj = json_decode($get_result);
+		if ($obj->tdate > 0){
+	  $ddate = date('Y-m-d', $obj->tdate);
+		}else{
+	  $ddate = '';
+		}
+		$rows[] =
+		array(
+		$data->serial,
+		substr($obj->no,0,5).'*****',
+		number_format($obj->amt/100,2),
+		$ddate,
+		$obj->tto,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, $lpage, 0);
+	return $output;
+}
+
+function vstaffreport_card() {
+	$output = drupal_get_form('vcard_form_overview');
+	$search_str = $_SESSION['vcard_search_filter'];
+	$card_lot=$_SESSION['vcard_brand_filter'];
+	if ($_SESSION['line_per_page'] > 0)
+	$lpage=$_SESSION['line_per_page'];
+	else
+	$lpage=10;
+
+	$header = array(
+	array('data' => t('Serial'), 'field' => 'serial'),
+	array('data' => t('PIN'), 'field' => 'number'),
+	array('data' => t('Balance'), 'field' => ''),
+	array('data' => t('TopUP Date'), 'field' => 'create_date'),
+	array('data' => t('Topup To'), 'field' => 'ref'),
+	);
+	$tablesort = tablesort_sql($header);
+
+	$sql="select * from vcard  ";
+	$sql_count = "Select count(id) from vcard ";
+	if ($card_lot > 0) {
+		$sql .= "  Where id = $card_lot ";
+		$sql_count .= "  Where id = $card_lot ";
+	}else {
+		//where number LIKE '$search_str%'
+		$sql .= "  where serial LIKE '$search_str%' ";
+		$sql_count .= "  where serial LIKE '$search_str%' ";
+		//return $output;
+
+	}
+
+	$result = pager_query($sql. $tablesort, $lpage, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, $lpage,0, $sql_count);
+	global $memcache;
+	while ($data = db_fetch_object($result)) {
+		$get_result = $memcache->get('serial:'.$data->serial);
+		$obj = json_decode($get_result);
+		$get_result = $memcache->get('card:'.$obj->{'card'});
+		$obj = json_decode($get_result);
+		if ($obj->tdate > 0){
+	  $ddate = date('Y-m-d', $obj->tdate);
+		}else{
+	  $ddate = '';
+		}
+		$amt = number_format($obj->amt/100,2);
+		if ($amt == '0.00') {
+			$rows[] =
+			array(
+			$data->serial,
+			substr($obj->no,5).'*****',
+			number_format($obj->amt/100,2),
+			$ddate,
+			$obj->tto,
+			);
+		}
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, $lpage, 0);
+	return $output;
+}
+
+function vreport_top10p() {
+	$output = drupal_get_form('vreport_form_overview');
+	$header = array(
+	array('data' => t('Provider'), 'field' => 'username'),
+	array('data' => t('Duration'), 'field' => 'sduration','sort'=>'desc'),
+	array('data' => t('Total'), 'field' => 'scost'),
+	array('data' => l('Export','excel'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vreport_search_filter'];
+	$datesearch = "";
+	switch ($_SESSION['vreport_date_filter']) {
+		default:
+			break;
+
+		case 1: // today
+			$datesearch = " age(CURRENT_DATE,acctstarttime) < '1 days'";
+			break;
+		case 2:  // yesterday
+			$datesearch = "age(CURRENT_DATE,acctstarttime) < '2 days' and  age(CURRENT_DATE,acctstarttime) > '1 days'";
+			break;
+		case 3: // this week
+			$datesearch = " age(CURRENT_DATE,acctstarttime) < '1 weeks'";
+			break;
+		case 4:  // last week
+			$datesearch = "age(CURRENT_DATE,acctstarttime) < '2 weeks' and  age(CURRENT_DATE,acctstarttime) > '1 weeks'";
+			break;
+		case 5: // this week
+			$datesearch = " age(CURRENT_DATE,acctstarttime) < '1 month'";
+			break;
+		case 6:  // last week
+			$datesearch = "age(CURRENT_DATE,acctstarttime) < '2 month' and  age(CURRENT_DATE,acctstarttime) > '1 month'";
+			break;
+		case 7: // this week
+			$datesearch = " age(CURRENT_DATE,acctstarttime) < '1 years'";
+			break;
+		case 8:  // last week
+			$datesearch = "age(CURRENT_DATE,acctstarttime) < '2 years' and  age(CURRENT_DATE,acctstarttime) > '1 years'";
+			break;
+
+	}
+	$callsearch = "";
+	switch ($_SESSION['vreport_call_filter']) {
+		default:
+			break;
+
+		case 0: // today
+			$callsearch = " duration > 0 ";
+			break;
+		case 1:  // yesterday
+			break;
+
+	}
+
+	//$sql="Select username,sum(duration) As sduration,sum(cost) As scost from voip_pcall ";
+	$sql="Select provider,sum(duration) As sduration,sum(pcost) As scost from voipcall ";
+	$sql_export= $sql;
+	$sql_count = "Select count(id) from voipcall ";
+	if ($search_str != '') {
+		$sql .= "  Where provider LIKE '$search_str%' ";
+		$sql_count .= "  Where provider LIKE '$search_str%' ";
+		$sql_export .= "  Where provider LIKE '$search_str%' ";
+	}else {
+		$sql .= "  Where 0=0 ";
+		$sql_count .= "  Where 0=0 ";
+		$sql_export .= "  Where 0=0 ";
+	}
+
+	if ($datesearch != '') {
+		$sql .= "  AND ".$datesearch;
+		$sql_count .= "  AND ".$datesearch;
+		$sql_export .= "  AND ".$datesearch;
+	}
+	if (strlen($callsearch) > 0) {
+		$sql .= "  AND ".$callsearch;
+		$sql_count .= "  AND ".$callsearch;
+		$sql_export .= "  AND ".$callsearch;
+	}
+
+	//    echo $sql_export;
+	//    echo "<br>";
+	//    echo $sql;
+	$sql .= " Group By provider";
+	$sql_count .= " Group By provider";
+	$sql_export .= " Group By provider";
+
+	$result = pager_query($sql. $tablesort, 50, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, 50,0, $sql_count);
+	//echo $sql;
+	$_SESSION['sqlstr'] = $sql_export;
+	$_SESSION['filename'] = "report.xls";
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		$rate->provider,
+		//        $rate->price,
+		number_format($rate->sduration/60,2),
+		number_format($rate->scost,2),
+                '',
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+	//  drupal_set_message($sql_export);
+
+	return $output;
+}
+
+function vreport_top10() {
+	$output = drupal_get_form('vreport_form_overview');
+	$header = array(
+	array('data' => t('Destination'), 'field' => 'tariffdesc'),
+	//    array('data' => t('Rate/min'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'sduration','sort'=>'desc'),
+	array('data' => t('Total'), 'field' => 'scost'),
+	array('data' => t('Cost'), 'field' => 'pcost'),
+	//    array('data' => t('Currency'), 'field' => 'currencysym'),
+	array('data' => l('Export','excel'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vreport_search_filter'];
+	$datesearch = "";
+	switch ($_SESSION['vreport_date_filter']) {
+		default:
+			break;
+
+		case 1: // today
+			$datesearch = " age(CURRENT_DATE,voipcall.acctstarttime) < '1 days'";
+			break;
+		case 2:  // yesterday
+			$datesearch = "age(CURRENT_DATE,voipcall.acctstarttime) < '2 days' and  age(CURRENT_DATE,voipcall.acctstarttime) > '1 days'";
+			break;
+		case 3: // this week
+			$datesearch = " age(CURRENT_DATE,voipcall.acctstarttime) < '1 weeks'";
+			break;
+		case 4:  // last week
+			$datesearch = "age(CURRENT_DATE,voipcall.acctstarttime) < '2 weeks' and  age(CURRENT_DATE,voipcall.acctstarttime) > '1 weeks'";
+			break;
+		case 5: // this week
+			$datesearch = " age(CURRENT_DATE,voipcall.acctstarttime) < '1 month'";
+			break;
+		case 6:  // last week
+			$datesearch = "age(CURRENT_DATE,voipcall.acctstarttime) < '2 month' and  age(CURRENT_DATE,voipcall.acctstarttime) > '1 month'";
+			break;
+		case 7: // this week
+			$datesearch = " age(CURRENT_DATE,voipcall.acctstarttime) < '1 years'";
+			break;
+		case 8:  // last week
+			$datesearch = "age(CURRENT_DATE,voipcall.acctstarttime) < '2 years' and  age(CURRENT_DATE,voipcall.acctstarttime) > '1 years'";
+			break;
+
+	}
+	$callsearch = "";
+	switch ($_SESSION['vreport_call_filter']) {
+		default:
+			break;
+
+		case 0: // today
+			$callsearch = " voipcall.duration > 0 ";
+			break;
+		case 1:  // yesterday
+			break;
+
+	}
+
+	//    $sql="Select voipcall.tariffdesc,voipcall.prefix,sum(voipcall.duration) As sduration,sum(voipcall.cost) As scost,sum(voip_pcall.cost) as pcost
+	//  from voipcall LEFT JOIN voip_pcall On voip_pcall.acctsessionid::text = voipcall.acctsessionid::text";
+	//    $sql_export="Select voipcall.tariffdesc,voipcall.prefix,sum(voipcall.duration) As sduration,sum(voipcall.cost) As scost,sum(voip_pcall.cost) as pcost
+	//  from voipcall LEFT JOIN voip_pcall On voip_pcall.acctsessionid::text = voipcall.acctsessionid::text";
+	$sql="Select voipcall.tariffdesc,voipcall.prefix,sum(voipcall.duration) As sduration,sum(voipcall.cost) As scost,sum(voipcall.pcost) as pcost
+  from voipcall";
+	$sql_export="Select voipcall.tariffdesc,voipcall.prefix,sum(voipcall.duration) As sduration,sum(voipcall.cost) As scost,sum(voipcall.pcost) as pcost
+  from voipcall";
+	$sql_count = "Select count(id) from voipcall ";
+	if ($search_str != '') {
+		$sql .= "  Where username LIKE '$search_str%' ";
+		$sql_count .= "  Where username LIKE '$search_str%' ";
+		$sql_export .= "  Where username LIKE '$search_str%' ";
+	}else {
+		$sql .= "  Where 0=0 ";
+		$sql_count .= "  Where 0=0 ";
+		$sql_export .= "  Where 0=0 ";
+	}
+
+	if ($datesearch != '') {
+		$sql .= "  AND ".$datesearch;
+		$sql_count .= "  AND ".$datesearch;
+		$sql_export .= "  AND ".$datesearch;
+	}
+	if (strlen($callsearch) > 0) {
+		$sql .= "  AND ".$callsearch;
+		$sql_count .= "  AND ".$callsearch;
+		$sql_export .= "  AND ".$callsearch;
+	}
+
+	//    echo $sql_export;
+	//    echo "<br>";
+	//    echo $sql;
+	$sql .= " Group By voipcall.tariffdesc,voipcall.prefix";
+	$sql_count .= " Group By voipcall.tariffdesc";
+	$sql_export .= " Group By voipcall.tariffdesc";
+
+	$result = pager_query($sql. $tablesort, 50, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, 50,0, $sql_count);
+	//echo $sql;
+	$_SESSION['sqlstr'] = $sql_export;
+	$_SESSION['filename'] = "report.xls";
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		$rate->tariffdesc.'('.$rate->prefix.')',
+		//        $rate->price,
+		number_format($rate->sduration/60,2),
+		number_format($rate->scost,2),
+		number_format($rate->pcost,2),
+                '',
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+	//  drupal_set_message($sql_export);
+
+	return $output;
+}
+
+function vreport_sum($type=0) {
+	//$type => 0=7 daye , 1= month
+	if (!$type) {
+		$tr = 'day';
+	}else {
+		$tr= 'month';
+	};
+	$sql = "select * from cdr_cost3";
+	$result = pager_query($sql, 7,0);
+	$header = array(
+	array('data' => t('Total'), 'field' => 'rday'),
+	array('data' => ''),
+	array('data' => t('Minutes'), 'field' => 'duration'),
+	);
+
+	while ($data = db_fetch_object($result)) {
+		$mdate = spliti (" ", $data->rday, 2);
+		$rows[] =
+		array(
+                "Total ".$mdate[0],
+		number_format($data->cost,2)." (Cost=".number_format($data->pcost,2).")",
+		$data->duration,
+		);
+	}
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 1, 0);
+
+	$header = array(
+	array('data' => t('Payment'), 'field' => 'date_trunc'),
+	array('data' => '')
+	);
+	$sql= " SELECT sum(paid)/100 AS spaid, date_trunc('".$tr."'::text, date) AS date_trunc
+    FROM voippayment Where paid > 0 and ref IS NOT NULL and ptype=1 
+      GROUP BY date_trunc('".$tr."'::text, date)
+        ORDER BY date_trunc('".$tr."'::text, date) DESC ";
+	$result = pager_query($sql, 7,0," Select id from voiptariff offset 0 limit 7 ;");
+	while ($data = db_fetch_object($result)) {
+		$mdate = spliti (" ", $data->date_trunc, 2);
+		$xrows[] =
+		array(
+                "Payment ".$mdate[0],
+		number_format($data->spaid,2),
+		);
+	}
+
+
+
+	$output .= theme('table', $header, $xrows);
+	$output .= theme('pager', NULL, 1, 0);
+
+	$header1 = array(
+	array('data' => t('Date'), 'field' => 'date_trunc'),
+	array('data' => t('Brand'), 'field' => 'brand'),
+	array('data' => t('Total'), ''),
+	array('data' => '')
+	);
+	$sql= " SELECT sum(paid)/100 AS spaid, lot,brand,date_trunc('day'::text, date) AS date_trunc FROM vcard_topup Where paid > 0 GROUP BY lot,brand,date_trunc('day'::text, date) ORDER BY date_trunc('day'::text, date) DESC ";
+	$result = pager_query($sql, 7,0," Select id from voiptariff offset 0 limit 7 ;");
+	while ($data = db_fetch_object($result)) {
+		$mdate = spliti (" ", $data->date_trunc, 2);
+		$yrows[] =
+		array(
+                "Payment ".$mdate[0],
+		$data->brand,
+		number_format($data->spaid,2),
+		);
+	}
+
+
+
+	$output .= theme('table', $header1, $yrows);
+	$output .= theme('pager', NULL, 1, 0);
+
+	return $output;
+};
+
+
+function vreport_graph_daily() {
+	srand((double)microtime()*1000000);
+
+
+	$g = new open_flash_chart_api();
+	$g->set_title( 'Daily Report', '{font-size: 20px;}' );
+	$g->set_width(650);
+	$g->set_height(350);
+
+	$sql= "select * from voip_call_daily ";
+	$result = pager_query($sql, 30,0);
+
+	while ($r = db_fetch_object($result)) {
+		$data[] = $r->sduration;
+		$data1[] = $r->date_trunc;
+		$label[] = $r->date_trunc;
+	}
+
+	$g->set_data( $data );
+	$g->set_tool_tip("#key#<br>#x_label#<br>#val#");
+	$g->bar_glass( 70, '#9933CC', 'Duration', 'Duration', 10 );
+
+	$g->set_x_labels( $label);
+	$g->set_x_label_style( 10, '#9933CC', 2, 1 );
+	$g->x_axis_colour( '#909090', '#ADB5C7' );
+	$g->y_axis_colour( '#909090', '#ADB5C7' );
+	$g->set_x_axis_steps( 2 );
+	//$g->set_x_axis_3d( 12 );
+
+	$g->set_y_max( max($data));
+	//    $g->set_y_label_steps( 4 );
+	$g->set_y_legend( 'TuxZA', 12, '#736AFF' );
+	$g->set_bg_colour('0xDFFFDF');
+	$output.= $g->render();
+
+
+	return $output;
+};
+
+
+
+function vreport_select_form_overview() {
+	if (empty($_SESSION['vreport_select_date_filter'])) {
+		$_SESSION['vreport_select_date_filter'] = 0;
+	}
+
+	$datereport[0] = "Call Daily";
+	$datereport[1] = "Call Weekly";
+	$datereport[2] = "Payment Daily";
+
+	$form['tfilter'] = array(
+            '#type' => 'select',
+            '#title' => t('Type'),
+            '#options' => $datereport,
+            '#default_value' => $_SESSION['vreport_select_date_filter']
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Select'));
+	//    $form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function vreport_select_form_overview_submit($form, &$form_state) {
+	//  print_r($form_state['values']);
+	$_SESSION['vreport_select_date_filter']  = $form_state['values']['tfilter'];
+};
+function vreport_graph_overview() {
+	$output = drupal_get_form('vreport_select_form_overview');
+	// echo $_SESSION['vreport_select_date_filter'];
+	switch ($_SESSION['vreport_select_date_filter']) {
+		default:
+			break;
+
+		case 0: // Daily
+			$output .= vreport_graph_daily();
+			break;
+		case 1 :  // Weekly
+			$output .= vreport_graph1_overview();
+			break;
+		case 2 :  // Weekly
+			$output .= vreport_graph_pay_daily();
+			break;
+	}
+
+	return $output;
+};
+
+function vreport_graph_pay_daily() {
+	srand((double)microtime()*1000000);
+
+
+	$g = new open_flash_chart_api();
+	$g->set_title( 'Daily Payment Report', '{font-size: 20px;}' );
+	$g->set_width(650);
+	$g->set_height(350);
+
+	$sql= " SELECT sum(paid) AS spaid, date_trunc('day'::text, date) AS date_trunc
+    FROM voippayment Where paid > 0 and ref IS NOT NULL
+      GROUP BY date_trunc('day'::text, date)
+        ORDER BY date_trunc('day'::text, date) DESC ";
+
+	$result = pager_query($sql, 10,0);
+
+	while ($r = db_fetch_object($result)) {
+		$data[] = $r->spaid;
+		$label[] = $r->date_trunc;
+	}
+
+	$g->set_data( $data );
+	$g->set_tool_tip("#key#<br>#x_label#<br>#val#");
+	$g->bar_glass( 70, '#9933CC', 'Duration', 'Duration', 10 );
+
+	$g->set_x_labels( $label);
+	$g->set_x_label_style( 10, '#9933CC', 2, 1 );
+	$g->x_axis_colour( '#909090', '#ADB5C7' );
+	$g->y_axis_colour( '#909090', '#ADB5C7' );
+	$g->set_x_axis_steps( 2 );
+	//$g->set_x_axis_3d( 12 );
+
+	$g->set_y_max( max($data));
+	//    $g->set_y_label_steps( 4 );
+	$g->set_y_legend( 'TuxZA', 12, '#736AFF' );
+	$g->set_bg_colour('0xDFFFDF');
+	$output.= $g->render();
+
+
+	return $output;
+};
+
+function yvreport_graph_daily() {
+	srand((double)microtime()*1000000);
+
+
+	$g = new open_flash_chart_api();
+	$g->set_title( 'Daily Report', '{font-size: 20px;}' );
+	$g->set_width(650);
+	$g->set_height(350);
+
+	$sql= "select * from voip_call_daily ";
+	$result = pager_query($sql, 30,0);
+
+	while ($r = db_fetch_object($result)) {
+		$data[] = $r->sduration;
+		$data1[] = $r->date_trunc;
+		$label[] = $r->date_trunc;
+	}
+
+	$g->set_data( $data );
+	$g->set_tool_tip("#key#<br>#x_label#<br>#val#");
+	$g->bar_glass( 70, '#9933CC', 'Duration', 'Duration', 10 );
+
+	$g->set_x_labels( $label);
+	$g->set_x_label_style( 10, '#9933CC', 2, 1 );
+	$g->x_axis_colour( '#909090', '#ADB5C7' );
+	$g->y_axis_colour( '#909090', '#ADB5C7' );
+	$g->set_x_axis_steps( 2 );
+	//$g->set_x_axis_3d( 12 );
+
+	$g->set_y_max( max($data));
+	//$g->set_y_label_steps( 4 );
+	$g->set_y_legend( 'TuxZA', 12, '#736AFF' );
+	$g->set_bg_colour('0xDFFFDF');
+	$output.= $g->render();
+
+
+	return $output;
+};
+
+
+
+function vreport_graph1_overview() {
+	srand((double)microtime()*1000000);
+
+
+	$g = new open_flash_chart_api();
+	$g->set_title( 'Total Minute Report', '{font-size: 20px;}' );
+	$g->set_width(650);
+
+	$sql= "select sum(duration_raw)/60 as duration,sum(pcost) As cost,sum(pcost) As pcost , date_trunc('day',acctstarttime ) As rday from voipcall where duration_raw > 0 group by rday Order by rday desc ";
+	$result = pager_query($sql, 7,0);
+
+	while ($r = db_fetch_object($result)) {
+		$data[] = $r->duration;
+		$data1[] = $r->cost;
+		$data2[] = $r->pcost;
+		$label[] = substr($r->rday,0,10);
+	}
+
+	$g->set_data( $data );
+	$g->set_tool_tip("#key#<br>#x_label#<br>#val#");
+	$g->bar_glass( 70, '#9933CC', 'Duration', 'Duration', 10 );
+
+	//  $g->set_data( $data );
+	//  $g->line_dot( 3, 5, '0xCC3399', 'Duration', 10);
+
+	$g->set_x_labels( $label);
+	$g->set_x_label_style( 10, '#9933CC', 0, 1 );
+	$g->x_axis_colour( '#909090', '#ADB5C7' );
+	$g->y_axis_colour( '#909090', '#ADB5C7' );
+	$g->set_x_axis_steps( 2 );
+	//$g->set_x_axis_3d( 12 );
+
+	$g->set_y_max( max($data));
+	//$g->set_y_label_steps( 4 );
+	$g->set_y_legend( 'TuxZA', 12, '#736AFF' );
+	$g->set_bg_colour('0xDFFFDF');
+	$output.= $g->render();
+
+	$g = new open_flash_chart_api();
+	$g->set_title( 'ยอดขาย Sale Report', '{font-size: 20px;}' );
+	$g->set_width(650);
+	$g->set_data( $data1 );
+	$g->bar_glass( 70, '#D54C78', 'Total', 'Total', 10 );
+
+	$g->set_data( $data2 );
+	$g->bar_glass( 70, '#3334AD', 'Cost', 'Cost', 10 );
+	$g->set_tool_tip("#key#<br>#x_label#<br>#val#");
+
+	if (max($data1) > max($data2))
+	$max = max($data1);
+	else
+	$max = max($data2);
+
+	$g->set_x_labels( $label);
+	$g->set_x_label_style( 10, '#9933CC', 0, 1 );
+	$g->x_axis_colour( '#909090', '#ADB5C7' );
+	$g->y_axis_colour( '#909090', '#ADB5C7' );
+	$g->set_x_axis_steps( 2 );
+	//  $g->set_x_axis_3d( 12 );
+
+
+	$g->set_y_max( $max);
+	//$g->set_y_label_steps( 4 );
+	$g->set_y_legend( 'TuxZA', 12, '#736AFF' );
+	$g->set_bg_colour('0xDFFFDF');
+	$output.= $g->render();
+
+
+	return $output;
+};
+
+
+function vreport_graphx_overview() {
+	$config['height'] = 300;
+	$config['width'] = 400;
+	$config['bgcolor'] = '#FE8F01';
+
+	$chart[ 'axis_category' ] = array ( 'font'=>"arial", 'bold'=>true, 'size'=>16, 'color'=>"000000", 'alpha'=>60, 'skip'=>0 ,'orientation'=>"vertical_up" );
+	$chart[ 'axis_ticks' ] = array ( 'value_ticks'=>false, 'category_ticks'=>false, 'major_thickness'=>2, 'minor_thickness'=>1, 'minor_count'=>1, 'major_color'=>"222222", 'minor_color'=>"222222" ,'position'=>"centered" );
+	$chart[ 'axis_value' ] = array ( 'font'=>"arial", 'bold'=>true, 'size'=>10, 'color'=>"ffffff", 'alpha'=>50, 'steps'=>6, 'prefix'=>"", 'suffix'=>"", 'decimals'=>0, 'separator'=>"", 'show_min'=>true );
+
+	$chart[ 'chart_border' ] = array ( 'color'=>"000000", 'top_thickness'=>0, 'bottom_thickness'=>0, 'left_thickness'=>5, 'right_thickness'=>0 );
+	$chart[ 'chart_data' ] = array ( array ("", "2007", "2006", "2005" ), array ( "Drupal", 100, 45, 25), array ( "Joomla", 80, 65, 35 ), array ( "Wordpress", 55, 30, 10 ) );
+	$chart[ 'chart_grid_h' ] = array ( 'alpha'=>10, 'color'=>"000000", 'thickness'=>0 );
+	$chart[ 'chart_grid_v' ] = array ( 'alpha'=>10, 'color'=>"000000", 'thickness'=>20 );
+	$chart[ 'chart_rect' ] = array ( 'x'=>50, 'y'=>50, 'width'=>320, 'height'=>200, 'positive_color'=>"ffffff", 'positive_alpha'=>30, 'negative_color'=>"ff0000",  'negative_alpha'=>10 );
+	$chart[ 'chart_type' ] = "stacked bar";
+	$chart[ 'chart_value' ] = array ( 'prefix'=>"", 'suffix'=>"", 'decimals'=>0, 'separator'=>"", 'position'=>"cursor", 'hide_zero'=>true, 'as_percentage'=>false, 'font'=>"arial", 'bold'=>true, 'size'=>12, 'color'=>"ff8888", 'alpha'=>100 );
+
+	$chart[ 'draw' ] = array ( array ( 'type'=>"text", 'color'=>"000033", 'alpha'=>25, 'font'=>"arial", 'rotation'=>0, 'bold'=>true, 'size'=>30, 'x'=>0, 'y'=>0, 'width'=>380, 'height'=>295, 'text'=>"CMS Progress Report", 'h_align'=>"right", 'v_align'=>"bottom" ) );
+
+	$chart[ 'legend_label' ] = array ( 'layout'=>"horizontal", 'font'=>"arial", 'bold'=>true, 'size'=>13, 'color'=>"ffffff", 'alpha'=>50 );
+	$chart[ 'legend_rect' ] = array ( 'x'=>25, 'y'=>15, 'width'=>350, 'height'=>5, 'margin'=>3, 'fill_color'=>"ffffff", 'fill_alpha'=>10, 'line_color'=>"000000", 'line_alpha'=>0, 'line_thickness'=>0 );
+
+	$chart[ 'series_color' ] = array ( "3b5743", "303d3d", "4c5e6f", "564546", "784e3a", "677b75" );
+
+	//print module_invoke('swfcharts', 'chart', $chart, $config);
+	return module_invoke('swfcharts', 'chart', $chart, $config);
+
+};
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vreport_cron() {
+	//  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+	//  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vreport_user($op, &$edit, &$user) {
+
+}
+
+
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vreport_overview() {
+	//$output = drupal_get_form('vreport_form_overview');
+	$output = drupal_get_form('report_filter_form');
+
+	//username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+	$header = array(
+	array('data' => t('Username'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+	array('data' => t('Number'), 'field' => 'calledstationid'),
+	array('data' => t('Dest'), 'field' => 'tariffdesc'),
+	array('data' => t('Rate/min'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'duration'),
+	array('data' => t('[Raw Min]'), 'field' => 'duration'),
+	array('data' => t('[Raw charge]'), 'field' => 'cost'),
+	array('data' => t('Total'), 'field' => 'cost'),
+	array('data' => t('Cost'), 'field' => 'cost'),
+//	array('data' => t('$'), 'field' => 'currencysym'),
+	array('data' => t('Provider'), 'field' => 'Provider'),
+	array('data' => l('Export','excel'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vreport_search_filter'];
+	$datesearch = "";
+	$datesearch = "voipcall.acctstarttime > timestamp '".$_SESSION['vreport_date1_filter']."'";
+	$datesearch .= " and voipcall.acctstarttime < timestamp '".$_SESSION['vreport_date2_filter']."'";
+	$callsearch = "";
+	$sql="Select voipcall.username,date_part('epoch',voipcall.acctstarttime) as acctstarttime,voipcall.calledstationid,voipcall.tariffdesc
+  ,voipcall.price,voipcall.duration,voipcall.duration_raw,voipcall.cost,voipcall.currencysym,voip_providers.provider as pname,pcost
+  from voipcall LEFT JOIN voip_providers On voip_providers.id = voipcall.provider_id ";
+
+	$sql_export="Select username,acctstarttime as CallDate,calledstationid As Number,tariffdesc As Tariff
+      ,price As  rate,duration As duration,cost As Charge,currencysym As Currency,prate As Cost_rate
+      , pcost As Cost, (cost - pcost) As margin from voipcall ";
+
+	$sql_count = "Select count(id) from voipcall ";
+	if ($search_str != '') {
+		//$sql .= "  Where username LIKE '$search_str%' ";
+		//$sql_count .= "  Where username LIKE '$search_str%' ";
+		//$sql_export .= "  Where username LIKE '$search_str%' ";
+		$sql .= "  Where voipcall.username LIKE '$search_str%' or voipcall.calledstationid LIKE '$search_str%' ";
+		$sql_count .= "  Where voipcall.username LIKE '$search_str%' or voipcall.calledstationid LIKE '$search_str%' ";
+		$sql_export .= "  Where voipcall.username LIKE '$search_str%' or voipcall.calledstationid LIKE '$search_str%' ";
+	}else {
+		$sql .= "  Where 0=0 ";
+		$sql_count .= "  Where 0=0 ";
+		$sql_export .= "  Where 0=0 ";
+	}
+
+	if ($datesearch != '') {
+		$sql .= "  AND ".$datesearch;
+		$sql_count .= "  AND ".$datesearch;
+		$sql_export .= "  AND ".$datesearch;
+	}
+	if (strlen($callsearch) > 0) {
+		$sql .= "  AND ".$callsearch;
+		$sql_count .= "  AND ".$callsearch;
+		$sql_export .= "  AND ".$callsearch;
+	}
+
+	//    echo $sql_export;
+	//    echo "<br>";
+	//    echo $sql;
+	$result = pager_query($sql. $tablesort, 50, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, 50,0, $sql_count);
+	//echo $sql;
+	$_SESSION['sqlstr'] = $sql_export;
+	$_SESSION['filename'] = "report.xls";
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		$rate->username,
+		date("Y-m-d H:i" ,$rate->acctstarttime),
+		$rate->calledstationid,
+		$rate->tariffdesc,
+		$rate->price,
+		format_interval($rate->duration),
+		format_interval($rate->duration_raw),  	
+		ceil($rate->duration_raw/60)*$rate->price,				
+		$rate->cost,
+		$rate->pcost,
+//		$rate->currencysym,
+		$rate->pname,
+                '',
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+	//  drupal_set_message($sql_export);
+
+	return $output;
+}
+
+/**
+ * Menu callback; generic function to display a page of the most frequent
+ * watchdog events of a specified type.
+ */
+function vreport_top($type) {
+
+	$header = array(
+	array('data' => t('Count'), 'field' => 'count', 'sort' => 'desc'),
+	array('data' => t('Message'), 'field' => 'message')
+	);
+
+	$result = pager_query("SELECT COUNT(wid) AS count, message FROM {watchdog} WHERE type = '%s' GROUP BY message ". tablesort_sql($header), 30, 0, "SELECT COUNT(DISTINCT(message)) FROM {watchdog} WHERE type = '%s'", $type);
+
+	while ($watchdog = db_fetch_object($result)) {
+		$rows[] = array($watchdog->count, truncate_utf8($watchdog->message, 56, TRUE, TRUE));
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 2));
+	}
+
+	$output  = theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 30, 0);
+
+	return $output;
+}
+
+function vreport_form_overview_submit($form, &$form_state) {
+	$_SESSION['vreport_search_filter'] = $form_state['values']['search'];
+	$_SESSION['vreport_date1_filter'] = $form_state['values']['date1'];
+	$_SESSION['vreport_date2_filter'] = $form_state['values']['date2'];
+	$_SESSION['vreport_call_filter'] = $form_state['values']['cfilter'];
+	$_SESSION['vreport_search_filter'] = $form_state['values']['search'];
+}
+
+function vreport_provider_overview() {
+
+	$output = drupal_get_form('report_filter_form');
+	//username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+	$header = array(
+	array('data' => t('Provider'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+	array('data' => t('Number'), 'field' => 'calledstationid'),
+	array('data' => t('Destination'), 'field' => 'tariffdesc'),
+	array('data' => t('Rate/min'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'duration'),
+	array('data' => t('Total'), 'field' => 'cost'),
+	array('data' => t('Currency'), 'field' => 'currencysym'),
+	array('data' => l('Export','excel'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vreport_search_filter'];
+	$callsearch = "";
+	switch ($_SESSION['vreport_call_filter']) {
+		default:
+			break;
+
+		case 0: // today
+			$callsearch = " duration > 0 ";
+			break;
+		case 1:  // yesterday
+			$callsearch = " duration >= 0 ";
+			break;
+
+	}
+
+	$sql="Select provider,date_part('epoch',acctstarttime) as acctstarttime,calledstationid,tariffdesc,prate,duration,pcost,currencysym from voipcall ";
+	$sql_export="Select provider,acctstarttime as CallDate,calledstationid As Number,tariffdesc As Tariff
+      ,price As  rate,duration As duration,pcost As Charge,currencysym As Currency,prate
+      , pcost As Cost from voipcall  ";
+	$sql_count = "Select count(id) from voipcall ";
+	if ($search_str != '') {
+		$sql .= "  Where provider LIKE '$search_str%' ";
+		$sql_count .= "  Where provider LIKE '$search_str%' ";
+		$sql_export .= "  Where provider LIKE '$search_str%' ";
+	}else {
+		$sql .= "  Where 0=0 ";
+		$sql_count .= "  Where 0=0 ";
+		$sql_export .= "  Where 0=0 ";
+	}
+
+	if ($datesearch != '') {
+		$sql .= "  AND ".$datesearch;
+		$sql_count .= "  AND ".$datesearch;
+		$sql_export .= "  AND ".$datesearch;
+	}
+	if ($callsearch == 0) {
+		$sql .= "  AND ".$callsearch;
+		$sql_count .= "  AND ".$callsearch;
+		$sql_export .= "  AND ".$callsearch;
+	}
+
+	//    echo $sql;
+	$result = pager_query($sql. $tablesort, 50, 0, $sql_count, $search_str);
+	$result = pager_query($sql . $tablesort, 50,0, $sql_count);
+	//echo $sql;
+	$_SESSION['sqlstr'] = $sql_export;
+	$_SESSION['filename'] = "report.xls";
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		$rate->provider,
+		date("Y-m-d H:i:s" ,$rate->acctstarttime),
+		$rate->calledstationid,
+		$rate->tariffdesc,
+		$rate->prate,
+		format_interval($rate->duration),
+		$rate->pcost,
+		$rate->currencysym,
+                '',
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+	//  drupal_set_message($sql_export);
+
+	return $output;
+}
+
+function report_filter_form() {
+
+	if (empty($_SESSION['vreport_search_filter'])) {
+		$_SESSION['vreport_search_filter'] = '';
+	}
+	if (empty($_SESSION['vreport_call_filter'])) {
+		$_SESSION['vreport_call_filter'] = 0;
+	}
+	if (empty($_SESSION['vreport_date1_filter'])) {
+		$_SESSION['vreport_date1_filter'] = date('Y-m-d H:i');
+	}
+	if (empty($_SESSION['vreport_date2_filter'])) {
+		$_SESSION['vreport_date2_filter'] = date('Y-m-d H:i');
+	}
+	$form['filter_group'] = array('#type' => 'fieldset',
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+	);
+	$format = 'Y-m-d H:i';
+
+	$form['filter_group']['date1'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'Start from',
+     '#default_value' => $_SESSION['vreport_date1_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 15, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '-3:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+	);
+	$form['filter_group']['date2'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'To',
+     '#default_value' => $_SESSION['vreport_date2_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 15, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '0:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+	);
+	$form['filter_group']['search'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Search',
+            '#size' => 20,
+            '#default_value' => $_SESSION['vreport_search_filter']
+	);
+  
+	$callfilter[0] = "Success Call";
+	$callfilter[1] = "All Call";
+	$form['filter_group']['cfilter'] = array(
+            '#type' => 'select',
+            '#title' => t('Filter by Call'),
+            '#options' => $callfilter,
+            '#default_value' => $_SESSION['vreport_call_filter']
+	);
+
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	//    $form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function report_filter_form_validate($form, &$form_state) {
+    $st = strtotime($form_state['values']['date1']);
+    $end = strtotime($form_state['values']['date2']);
+    if ($st > $end){
+       form_set_error('date1', 'Start time Error');
+    }
+    if ($st > strtotime("now")){
+       form_set_error('date1', 'Start time Error');
+    }            
+}
+
+function report_filter_form_submit($form, &$form_state) {
+	//	$_SESSION['vreport_search_filter'] = $form_state['values']['search'];
+	$_SESSION['vreport_date1_filter'] = $form_state['values']['date1'];
+	$_SESSION['vreport_date2_filter'] = $form_state['values']['date2'];
+	$_SESSION['vreport_call_filter'] = $form_state['values']['cfilter'];
+	$_SESSION['vreport_search_filter'] = $form_state['values']['search'];
+}
+
+function vreport_form_overview() {
+
+	if (empty($_SESSION['vreport_search_filter'])) {
+		$_SESSION['vreport_search_filter'] = '';
+	}
+	if (empty($_SESSION['vreport_date1_filter'])) {
+		$_SESSION['vreport_date1_filter'] = date('Y-m-d H:i');
+	}
+	if (empty($_SESSION['vreport_date2_filter'])) {
+		$_SESSION['vreport_date2_filter'] = date('Y-m-d H:i');
+	}
+	if (empty($_SESSION['vreport_call_filter'])) {
+		$_SESSION['vreport_call_filter'] = 0;
+	}
+
+	$output = drupal_get_form('date_form');
+	
+	$form['filter_group'] = array('#type' => 'fieldset',
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+	);
+
+
+ 
+  // Provide a format using regular PHP format parts (see documentation on php.net).
+  // If you're using a date_select, the format will control the order of the date parts in the selector,
+  // rearrange them any way you like. Parts left out of the format will not be displayed to the user.
+  $format = 'Y-m-d H:i';
+
+  $form['filter_group']['date1'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'Start from',
+     '#default_value' => $_SESSION['vreport_date1_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 1, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '-3:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+  );	
+  $form['filter_group']['date2'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'To',
+     '#default_value' => $_SESSION['vreport_date2_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 1, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '0:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+  );	
+	$form['filter_group']['search'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Search',
+            '#size' => 20,
+            '#default_value' => $_SESSION['vreport_search_filter']
+	);
+  
+	$callfilter[0] = "Success Call";
+	$callfilter[1] = "All Call";
+	$form['filter_group']['cfilter'] = array(
+            '#type' => 'select',
+            '#title' => t('Filter by Call'),
+            '#options' => $callfilter,
+            '#default_value' => $_SESSION['vreport_call_filter']
+	);
+
+
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	//    $form['#redirect'] = FALSE;
+
+	return $form;
+}

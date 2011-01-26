@@ -1,0 +1,382 @@
+<?php
+
+function vguest_menu() {
+
+		$items['service'] = array(
+    		'title' => 'TopUp',
+    		'page callback' => 'drupal_get_form',
+                'page arguments' => array('vguest_topup_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+    		);
+
+		$items['sms'] = array(
+                'description' => 'SMS Service.', 'title' => 'SMS Service',
+		'page callback' => 'vguest_sms',
+                'weight' => -1,
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['secure_transfer/neptune001'] = array(
+                'description' => 'SMS Service.', 'title' => 'SMS Service',
+		'page callback' => 'vguest_transfer',
+                'weight' => -1,
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['service/test'] = array(
+                'description' => 'Member Service.', 'title' => 'Test',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vguest_test_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		$items['rate/xxxautocomplete'] = array(
+    		'title' => 'Autocomplete Rate',
+    		'page callback' => 'vguest_autocomplete',
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK);
+	return $items;
+}
+function vguest_sms() {
+   if (isset($_REQUEST["number"])){
+       list($type, $msg) = split(" ",$_REQUEST["msg"], 2);
+       $type=strtolower($type);
+       $tonumber = $_REQUEST["number"];
+       //create user create_account_mobile();
+	$result = db_query("SELECT create_account_mobile('%s') ;", $tonumber);
+	$create_u = db_fetch_object($result);
+       if ($type=='s1'){   // info
+		$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $tonumber);
+		$u = db_fetch_object($result);
+		if ($u->balance<0)
+		   $u->balance = 0;
+		if ($u) {
+    			$str= "<reply> จำนวนเงินคงเหลือ (Balance)   ".$u->balance.$u->currencysym."\n วันหมดอาย (Expire) :".$u->exp_date."</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+			die;
+		}
+
+       }else if ($type=='s2'){ // topup
+    		list($pin) = split(" ",$msg, 1);
+		$pin = trim($pin);
+		$result = db_query("SELECT card_pay_new('%s','%s',1) As cpay ;", $pin,$tonumber);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+    			$str="<reply>TopUp From ".$pin." Fail. หมายเลขบัตรไม่ถูกต้อง</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+    			watchdog('user', $tonumber." Topup Fail PIN:".$pin);
+			die;
+		}else{
+    		    if ($card_lot->cpay > 0) {
+			$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $tonumber);
+			$u = db_fetch_object($result);
+			$str="<reply>เติมเงินจาก ".$pin.' จำนวน '.$card_lot->cpay." เรียบร้อย. คงเหลือ".$u->balance.$u->currencysym."</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+			die;
+    		    }else{
+    			$str="<reply>TopUp From ".$pin." Fail. หมายเลขบัตรไม่ถูกต้อง</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+			die;
+    		    };
+		};  
+
+
+       }else if ($type=='s3'){ // transfer
+
+    		list($pin,$amt) = split(" ",$msg, 2);
+		$rnumber = trim($pin);
+		$amt = trim($amt);
+		$result = db_query("SELECT create_account_mobile('%s') ;", $rnumber);
+		$create_u = db_fetch_object($result);
+		if ($amt < 10) {
+    			$str="<reply>Transfer Fail Fail. โอนเงินไม่สำเร็จ ขั้นต่ำ 10 บาท</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+    			watchdog('user', $tonumber." Transfer Fail balance under 10 Bath");
+			echo $tis_str;
+			die;
+		};
+		$result = db_query("SELECT i_pay('%s','%s',%d,1) As cpay ;", $tonumber,$rnumber,$amt);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+    			echo "<reply>SMS From:".$_REQUEST["number"]." Error.</reply>";
+    			watchdog('user', $tonumber." Transfer Fail ");
+			die;
+		}else{
+    		    if ($card_lot->cpay > 0) {
+			$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $tonumber);
+			$u = db_fetch_object($result);
+			//$str="<reply>โอนเงินให้ '.$rnumber.' จำนวน '.$amt.$u->currencysym." เรียบร้อย. คงเหลือ ".$u->balance.$u->currencysym."</reply>";
+			$str="<reply> Transfer ".$amt.$u->currencysym." to ".$rnumber." success. Balance:".$u->balance.$u->currencysym."</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+			$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $rnumber);
+			$u = db_fetch_object($result);
+    			$crl = curl_init();
+    			$url = "http://gateway.smsshooter.com/dome.php";
+    			curl_setopt($crl, CURLOPT_URL, $url);
+    			$tstr = "เติมเงินจาก ".$tonumber." จำนวน ".$amt.$u->currencysym." บาท \n คงเหลือ".$u->balance.$u->currencysym;
+    			$tis_str = iconv("UTF-8","TIS620", $tstr);
+    			$postdata = array(
+        		    "user"=>"dome",
+        		    "password"=>"sms4dome",
+        		    "mobile"=>$rnumber,
+        		    "sender"=>$tonumber,
+        		    "msg"=>$tis_str,
+        		);
+    			curl_setopt ($crl, CURLOPT_POSTFIELDS, $postdata);
+    			$result=curl_exec($crl);
+    			$headers = curl_getinfo($crl);
+    			watchdog('user', $tonumber." Transfer  ".$amt." to ".$rnumber);
+			die;
+    		    }else{
+    			$str="<reply>Transfer Fail Fail. โอนเงินไม่สำเร็จ</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $tis_str;
+    			watchdog('user', $tonumber." Transfer Fail system errror".$card_lot->cpay > 0);
+			die;
+    		    };
+		};  
+
+       
+       }else{
+
+    	    echo "<reply>SMS From:".$_REQUEST["number"]." Error.</reply>";
+       
+       };
+       
+        echo "<reply>SMS From:".$_REQUEST["number"]." Msg:".$_REQUEST["msg"]."</reply>";
+      
+      // watchdog('user', "TopUP From SMS ".$pin." to Account ".$tonumber." By ".$_REQUEST["username"]);
+ 
+  if (strlen($pin) > 0){
+    $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $pin,$tonumber);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$pin." Fail.",'error');
+    }else{
+      if ($card_lot->cpay > 0) {
+	echo "<reply>TopUp From ".$pin.' amount '.$card_lot->cpay." To ".$tonumber." Success.</reply>";
+	die;
+      }else{
+        echo "<reply>TopUp From ".$pin." Fail.</reply>";
+	die;
+      };
+    };  
+
+   };
+  };
+//        echo "<reply>TopUp Fail.</reply>";
+	die;
+       
+return;
+};
+
+function vguest_transfer() {
+   if (isset($_REQUEST["number"]) && isset($_REQUEST["tonumber"]) && isset($_REQUEST["amt"])){
+		$rnumber = $_REQUEST["number"];
+    		$tonumber = $_REQUEST["tonumber"];
+		$amt = $_REQUEST["amt"];
+
+    		//create user create_account_mobile();
+		$result = db_query("SELECT create_account_mobile('%s') ;", $tonumber);
+		$create_u = db_fetch_object($result);
+		if ($amt < 1) {
+			echo "error amt";
+			die;
+		};
+		$result = db_query("SELECT i_pay('%s','%s',%d,1) As cpay ;", $rnumber,$tonumber,$amt);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			echo "error dbfail";
+			die;
+		}else{
+    		    if ($card_lot->cpay > 0) {
+			$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $rnumber);
+			$u = db_fetch_object($result);
+			$str="<reply> Transfer ".$amt.$u->currencysym." to ".$rnumber." success. Balance:".$u->balance.$u->currencysym."</reply>";
+			$tis_str = iconv("UTF-8","TIS620", $str);
+			echo $u->balance." ";
+			$result = db_query("SELECT balance,currencysym,to_char(exp_date, 'DD-MM-YYYY') as exp_date from vuser1 where username='%s' ;", $tonumber);
+			$u = db_fetch_object($result);
+    			$crl = curl_init();
+    			$url = "http://gateway.smsshooter.com/dome.php";
+    			curl_setopt($crl, CURLOPT_URL, $url);
+    			$tstr = "เติมเงินจาก ".$rnumber." จำนวน ".$amt.$u->currencysym." บาท \n คงเหลือ".$u->balance.$u->currencysym;
+    			$tis_str = iconv("UTF-8","TIS620", $tstr);
+    			$postdata = array(
+        		    "user"=>"dome",
+        		    "password"=>"sms4dome",
+        		    "mobile"=>$tonumber,
+        		    "sender"=>$rnumber,
+        		    "msg"=>$tis_str,
+        		);
+    			curl_setopt ($crl, CURLOPT_POSTFIELDS, $postdata);
+    			$result=curl_exec($crl);
+    			$headers = curl_getinfo($crl);
+    			watchdog('user', $tnumber." Transfer  ".$amt." to ".$tonumber);
+			die;
+    		    }else{
+			echo "error ".$card_lot->cpay;
+			die;
+    		    };
+		};  
+ 
+  };
+	echo "error".$_REQUEST["number"].$tonumber = $_REQUEST["tonumber"].$amt = $_REQUEST["amt"];
+	die;
+       
+return;
+};
+
+//isset($_REQUEST["number"])
+function vguest_test_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function vguest_test_form_submit($form, &$form_state) {
+      drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+      return;
+
+};
+
+function vguest_sms_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+
+function vguest_sms_form_submit($form, &$form_state) {
+  global $user;
+   watchdog('user', "TopUP From SMS '$form[pin]' to Account '$form[username]'");
+  if (strlen($form['pin']) > 0){
+    $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form['pin'],$form['username']);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+    }else{
+      if ($card_lot->cpay > 0) {
+	echo "<reply>TopUp From ".$form['pin'].' amount '.$card_lot->cpay." To ".$form['username']." Success.</reply>";
+	die;
+        //drupal_set_message("TopUp From ".$form['pin'].' amount '.$card_lot->cpay." To ".$form['username']." Success.");
+      }else{
+        echo "<reply>TopUp From ".$form['pin']." Fail.</reply>";
+        //drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+	die;
+      };
+    };  
+  };
+      
+    return;
+}
+
+function vguest_topup_form() {
+	$form['pin'] = array(
+	'#type' => 'textfield',
+	'#title' => t("PIN"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("Input PIN Code."),
+	);
+	$form['username'] = array(
+	'#type' => 'textfield',
+	'#title' => t("User"),
+        '#default_value' => '',
+        '#required' => TRUE,
+	'#description' => t("TopUp to User."),
+	);
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('TopUp'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+
+function vguest_topup_form_submit($form, &$form_state) {
+  global $user;
+  //$form_state['values'][app]
+  if (strlen($form_state['values']['pin']) > 0){
+    $sql=sprintf("SELECT create_dr_user('%s') ;", $form_state['values']['username']);
+    $result = db_query($sql);
+    $sql = "SELECT card_pay_new('".$form_state['values']['pin']."','".$form_state['values']['username']."',1) As cpay ;";
+    // drupal_set_message($sql,'error');
+    $result = db_query($sql);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+      drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+
+    }else{
+      if ($card_lot->cpay > 0) {
+        drupal_set_message("TopUp From ".$form_state['values']['pin'].' amount '.$card_lot->cpay." To ".$form_state['values']['username']." Success.");
+      }else{
+        drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+      };
+    };  
+  };
+      
+    return;
+}
+
+function vguest_autocomplete($string = '') {
+/*
+  $matches["Thailand"] = "Thailand";
+  $matches[2] = "xczxcThailand";
+  $matches["ccc"] = $string;
+  print drupal_to_js($matches);
+    exit();
+*/
+
+  if ($string != '') {
+    $sql = " SELECT prefix,description,price,currencysym FROM rate_view WHERE grpid=1 AND description LIKE '%".$string."%'".
+             "Or prefix LIKE '".$string."%'";
+    $result = pager_query($sql, 50,0);
+    $matches = array();
+    while ($rate = db_fetch_object($result)) {
+      $d = $rate->prefix.' '.$rate->description.'  Rate:'.$rate->price.' '.$rate->currencysym;
+      $matches[$d] = check_plain($d);
+    }
+    print drupal_to_js($matches);
+    exit();
+  }
+}

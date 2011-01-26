@@ -1,0 +1,1711 @@
+<?php
+function vstaff_ref1($id=NULL){
+	$r=array();
+	$r['0']='โปรดเลือก';
+	$r['1']='เบอร์เสีย';
+	$r['2']='เบอร์หาย';
+	$r['3']='โทรศัพท์เสีย';
+	$r['4']='โอนให้เพื่อน,ญาติพี่น้อง';
+	$r['5']='โอนให้ลูกค้า';
+	$r['6']='อื่นๆ';
+	if ($id){
+		return  $r[$id];
+	}else{
+		return $r;
+	}
+
+}
+function vstaff_ref1_adj($id=NULL){
+
+	$r=array();
+	$r['0']='โปรดเลือก';
+	$r['11']='คุณภาพเสียงไม่ดี';
+	$r['12']='ใช้งานยาก';
+	$r['13']='ไม่พอใจการให้บริการ';
+	$r['14']='โทรติดยาก';
+	$r['15']='ระบบ Down บ่อย';
+	$r['16']='อื่นๆ';
+	if ($id){
+		return  $r[$id];
+	}else{
+		return $r;
+	}
+
+}
+
+function vstaff_perm() {
+	return array('access staff');
+}
+function vstaff_context_links_alter(&$links) {
+	$item1 = menu_get_item();
+	$path=$item1['path'];
+	//print_r($item1); die;
+	//  if (context_get('context', 'spaces-feature-members') && module_exists('ucreate') && user_access('create users')) {
+	switch ($path) {
+		case 'staff/adjust':
+			$links['report_adjust'] = array(
+        			'title' => 'Report',
+        			'href' => 'staff/adjust_report',
+			);
+			break;
+		case 'staff/ckuser':
+			$item = menu_get_item('staff/service');
+			$item2 = menu_get_item('node/add/casetracker-basic-case');
+			///casetracker
+			if ($item['access']) {
+				$links['staff_add_service'] = array(
+        			'title' => 'Add Service',
+        			'href' => $item['href'].'/',
+				);
+				$links['staff_add_case'] = array(
+        			'title' => 'Add Case',
+        			'href' => $item2['href'].'/'.$item1['page_arguments']['0'],
+				);
+			}
+	}
+	//  }
+}
+
+
+function vstaff_menu() {
+	// search
+	// member
+	// register
+	// card
+	// check topup card
+	// card call history
+	// adjust credit
+	//array('Register','Member','Adjust Credit','Check Card','Check Usage','Topup','Transfer','Check Rate','Staff Transfer');
+
+	$items['staff'] = array(
+      'description' => 'View user.', 'title' => 'Staff',
+      'page callback' => 'vstaff_overview',
+      'menu_name' => 'features',
+      'weight' => -5,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+        'type' => MENU_NORMAL_ITEM,
+	);
+	/*
+	 $items['staff/search'] = array(
+	 'description' => 'View user.', 'title' => 'Search',
+	 'page callback' => 'vstaff_search',
+	 'menu_name' => 'features',
+	 'weight' => -99,
+	 'access arguments' => array('access staff'),
+	 'type' => MENU_DEFAULT_LOCAL_TASK
+	 );
+	 */
+	$items['staff/list'] = array(
+      'description' => 'View user.', 'title' => 'Member',
+      'page callback' => 'vstaff_overview',
+        'menu_name' => 'features',
+      'weight' => -1,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+	);
+
+	$items['staff/adjust'] = array(
+    	    'description' => 'Adjust Credit.', 'title' => 'Adjust Credit',
+    	    'menu_name' => 'features',
+    	    'weight' => 8,
+    	    'page callback' => 'drupal_get_form',
+    	    'page arguments' => array('vstaff_adjust_form'),
+    	    'access callback' => 'user_access',
+    	    'access arguments' => array('Adjust Credit'),
+    	    'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/add'] = array(
+        'description' => 'Create Account.','title' => 'Register',
+        'menu_name' => 'features',
+      'weight' => -99,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vstaff_form'),
+      'access callback' => 'user_access',
+      'access arguments' => array('Register'),
+      'type' => MENU_LOCAL_TASK
+	);
+	/*
+	 $items['staff/service'] = array(
+	 'description' => 'Recurring Service.','title' => 'Service',
+	 'menu_name' => 'features',
+	 'weight' => 99,
+	 'page callback' => 'drupal_get_form',
+	 'page arguments' => array('vstaff_service_form'),
+	 'access arguments' => array('access staff'),
+	 'type' => MENU_LOCAL_TASK
+	 );
+	 $items['staff/cardlist'] = array(
+	 'description' => 'Card.','title' => 'Card',
+	 'menu_name' => 'features',
+	 'page callback' => 'vreport_card',
+	 'access arguments' => array('access staff'),
+	 'type' => MENU_LOCAL_TASK
+	 );
+
+	 */
+
+	$items['staff/topup'] = array(
+      'description' => 'View user.', 'title' => 'Topup',
+      'page callback' => 'drupal_get_form',
+      'menu_name' => 'features',
+      'page arguments' => array('vstaff_topup_form'),
+      'weight' => 10,
+      'access callback' => 'user_access',
+      'access arguments' => array('Topup'),
+      'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/transfer'] = array(
+      'description' => 'View user.', 'title' => 'Transfer',
+      'page callback' => 'drupal_get_form',
+      'menu_name' => 'features',
+      'page arguments' => array('vstaff_transfer_form'),
+      'weight' => 10,
+      'access callback' => 'user_access',
+      'access arguments' => array('Transfer'),
+      'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/stafftransfer'] = array(
+      'description' => 'View user.', 'title' => 'Staff Transfer',
+      'page callback' => 'drupal_get_form',
+      'menu_name' => 'features',
+      'page arguments' => array('vstaff_staff_transfer_form'),
+      'weight' => 12,
+      'access callback' => 'user_access',
+      'access arguments' => array('Staff Transfer'),
+      'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/card_check'] = array(
+            'title' => 'Check Card', 
+            'page callback' => 'vcard_check',
+    	    'menu_name' => 'features',
+    	    'access callback' => 'user_access',
+    	    'access arguments' => array('Check Card'),
+    	    'weight' => 10,
+            'type' => MENU_LOCAL_TASK);
+
+	$items['staff/serial_check'] = array(
+            'title' => 'Check Serial', 
+            'page callback' => 'vcard_check_serial',
+    	    'menu_name' => 'features',
+    	    'access callback' => 'user_access',
+    	    'access arguments' => array('Check Serial'),
+    	    'weight' => 10,
+            'type' => MENU_LOCAL_TASK);
+
+	$items['staff/ckuser'] = array(
+    	    'description' => 'View user.', 'title' => 'Check Usage',
+    	    'page callback' => 'vstaff_check_user',
+    	    'menu_name' => 'features',
+    	    'weight' => 10,
+    	    'access callback' => 'user_access',
+    	    'access arguments' => array('Check Usage'),
+    	    'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/rate'] = array(
+                'description' => 'View rate.', 'title' => 'Check Rate',
+                'page callback' => 'rate_overview',
+                'menu_name' => 'features',
+                'weight' => 11,
+    		'access callback' => 'user_access',
+             'access arguments' => array('Check Rate'),
+    	    'type' => MENU_LOCAL_TASK
+	);
+
+	$items['staff/detail'] = array(
+      'description' => 'View Payment.', 'title' => 'Payment',
+      'page callback' => 'vstaff_detail',
+      'weight' => 1,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_CALLBACK
+	);
+
+	$items['staff/cdr'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vstaff_cdr',
+      'weight' => 1,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_CALLBACK
+	);
+
+
+	$items['staff/edit'] = array(
+      'description' => 'View user.', 'title' => 'Edit member',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vstaff_edit_form'),
+      'weight' => 10,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_CALLBACK
+	);
+
+	$items['staff/create'] = array(
+      'description' => 'Create user.', 'title' => 'Edit',
+      'page callback' => 'vstaff_create_account',
+      'weight' => 10,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_CALLBACK
+	);
+
+	$items['staff/delete'] = array(
+	'title' => 'Delete',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('vstaff_confirm_delete'),
+	'access callback' => 'user_access',
+        'access arguments' => array('access superviser'),
+	'type' => MENU_CALLBACK,
+	);
+
+	$items['staff/guser'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vstaff_load',
+      'weight' => 1,
+      'access callback' => 'user_access',
+      'access arguments' => array('Member'),
+      'type' => MENU_CALLBACK
+	);
+	$items['staff/userdetail'] = array(
+                'description' => 'Report Route.',
+                'page callback' => 'vstaff_check_user',
+                'weight' => 5,
+    		'access callback' => 'user_access',
+    		'access arguments' => array('Member'),
+                'type' => MENU_CALLBACK);
+
+	$items['staff/lockcard'] = array(
+	'title' => 'Lock card',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('vstaff_confirm_lockcard'),
+	'access callback' => 'user_access',
+    	    'access arguments' => array('Lock Card/User'),
+	'type' => MENU_CALLBACK,
+	);
+	$items['staff/lockuser'] = array(
+	'title' => 'Lock card',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('vstaff_confirm_lockuser'),
+	'access callback' => 'user_access',
+	'access arguments' => array('Lock Card/User'),
+	'type' => MENU_CALLBACK,
+	);
+
+	$items['staff/log'] = array(
+	  'title' => 'Logs',
+	  'description' => 'View events that have recently been logged.',
+	  'page callback' => 'dblog_overview',
+	  'access callback' => 'user_access',
+	  'access arguments' => array('Check Log'),
+	  'weight' => 13,
+	  'file' => 'vstaff.module.defaults.inc',
+	  'type' => MENU_LOCAL_TASK
+	);
+	$items['staff/case'] = array(
+	  'title' => 'Case',
+	  'description' => 'Case.',
+	  'weight' => 14,
+	  'page callback' => 'vsystem_case',
+	  'page arguments' => array(),
+	  'access callback' => 'user_access',
+	  'access arguments' => array('Check Log'),
+	  'weight' => 13,
+	  'type' => MENU_LOCAL_TASK
+	);
+	
+	$items['staff/adjust_report'] = array(
+      'description' => 'Create user.', 'title' => 'Edit',
+      'page callback' => 'vstaff_adjust_report',
+      'weight' => 10,
+      'access callback' => 'user_access',
+      'access arguments' => array('Admin'),
+      'type' => MENU_CALLBACK
+	);
+
+	return $items;
+}
+function vstaff_adjust_report(){
+	$output = drupal_get_form('date_form');
+	return $output;
+};
+function vstaff_confirm_lockcard(&$form_state, $serial=null) {
+	if (!$serial) {
+		return drupal_goto('staff/card_check');
+	}
+	$form['serial'] = array('#type' => 'value', '#value' => $serial);
+
+	return confirm_form($form,
+	t('Are you sure you want to Lock/Unlock Card %name?', array('%name' => $serial)),
+	'staff/card_check/'.$acc,
+	t('This action cannot be undone.'),
+	t('Lock'), t('Cancel'));
+}
+
+function vstaff_confirm_lockcard_submit($form, &$form_state) {
+	if ($form['confirm']) {
+		$acc = $form_state['values']['serial'];
+		$result = db_query("select disable as status from a_card  where serial='%s'",$acc);
+		$data = db_fetch_object($result);
+		if ($data->status=='f'){
+			db_query("update a_card set disable=true where serial='%s'",$acc);
+			drupal_set_message($acc." has been Locked.");
+		}else{
+			db_query("update a_card set disable=false where serial='%s'",$acc);
+			drupal_set_message($acc." has been UnLocked.");
+		}
+	}
+	if (!isset($_REQUEST['destination'])) {
+		$form_state['redirect'] = 'staff/card_check/'.$acc;
+	}
+}
+
+function vstaff_confirm_lockuser(&$form_state, $serial=null) {
+	if (!$serial) {
+		return drupal_goto('staff/card_check');
+	}
+	$form['serial'] = array('#type' => 'value', '#value' => $serial);
+	$form['reason'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Reason"),
+    '#maxlength' => 138,
+	'#size' => 64,
+    '#required' => true
+	);
+	return confirm_form($form,
+	t('Are you sure you want to Lock/Unlock  %name?', array('%name' => $serial)),
+	'staff/card_check/'.$acc,
+	t('This action cannot be undone.'),
+	t('Lock/unlock'), t('Cancel'));
+}
+
+function vstaff_confirm_lockuser_submit($form, &$form_state) {
+	global $user;
+	if ($form['confirm']) {
+		$acc = $form_state['values']['serial'];
+		$result = db_query("select status from dr_users  where name='%s'",$acc);
+		$data = db_fetch_object($result);
+		if ($data->status==1){
+			db_query("update dr_users set status=0 where name='%s'",$acc);
+			drupal_set_message($acc." has been Locked.");
+			watchdog('Lock-User', 'Lock %number %name.', array('%number'=>$acc,'%name' => $form_state['values']['reason']), WATCHDOG_WARNING);
+		}else{
+			db_query("update dr_users set status=1 where name='%s'",$acc);
+			drupal_set_message($acc." has been UnLocked.");
+			watchdog('Lock-User', 'UnLock %number %name.', array('%number'=>$acc,'%name' => $form_state['values']['reason']), WATCHDOG_WARNING);
+		}
+		//watchdog('Tuxza', 'Created new vocabulary %name.', array('%name' => $form_state['values']['name']), WATCHDOG_NOTICE, l(t('edit'), 'admin/content/taxonomy/edit/vocabulary/'. $form_state['values']['vid']));
+	}
+	if (!isset($_REQUEST['destination'])) {
+		$form_state['redirect'] = 'staff/ckuser/'.$acc;
+	}
+}
+
+function vstaff_search(){
+	$output ="";
+	$output = drupal_get_form('vstaff_form_search');
+	return $output;
+};
+
+function vstaff_service_form_submit($form, &$form_state){
+	$udetail->name=$form_state['values']['user'];
+	$udetail=vsystem_sync_user($udetail);
+	$result = db_query('SELECT DISTINCT(description),id,price,day FROM ws_service where id ='.$form_state['values']['service']);
+	$data = db_fetch_object($result);
+	if (!$result){
+		drupal_set_message("Service Error ",'error');
+		return drupal_goto('staff/service');
+	}
+	// check service already
+	$result = db_query("SELECT id FROM ws_service_member where sid = %d and username='%s'",$data->id,$form_state['values']['user']);
+	$ck = db_fetch_object($result);
+	if ($ck){
+		$r = db_query("update ws_service_member set expire=expire+'%d days' where sid = %d and username='%s'",$data->day,$data->id,$form_state['values']['user']);
+	}else{
+		$r = db_query("insert into ws_service_member(expire,sid,username) Values(Now()+'%d days',%d,'%s')",$data->day,$data->id,$form_state['values']['user']);
+		$r = db_query("INSERT INTO  voippayment(name,accountid,ref,paid_out,ptype)  VALUES ('%s',%d,'%s',%f,3)",$udetail->name,$udetail->vuid,$data->description,$data->price*100);
+	}
+	tmember_dec_balance($udetail->name,$data->price*100);
+	return drupal_goto('b/staff/ckuser/'.$form_state['values']['user']);
+}
+function vstaff_service_form_validate($form, &$form_state) {
+	$udetail->name=$form_state['values']['user'];
+	$udetail=vsystem_sync_user($udetail);
+	$result = db_query('SELECT DISTINCT(description),id,price,day FROM ws_service where id ='.$form_state['values']['service']);
+	if ($result)
+	$data = db_fetch_object($result);
+	if ($form_state['values']['confirm']==0){
+		form_set_error('category', 'Please Confirm your input');
+	}
+	if ($udetail->notvalid ==1 ) {
+		form_set_error('category', 'User not Found!');
+	}else{
+		if ($udetail->balance < $data->price) {
+			form_set_error('category', 'Need :'.number_format($data->price,2,'.',',').'.Please topup');
+		}
+	}
+}
+function vstaff_service_form($form_state = array(),$id = NULL) {
+
+	$form['user'] = array(
+    '#type' => 'textfield',
+    '#title' => t("User"),
+    '#maxlength' => 25,
+	'#size' => 20,
+	'#default_value' => $id,
+    '#required' => true
+	);
+	$types = array();
+	$result = db_query('SELECT DISTINCT(description),id,price,day FROM ws_service ORDER BY description');
+	while ($data = db_fetch_object($result)) {
+		$names[$data->id] = $data->description.' :'.$data->price.' / '.$data->day.' days';
+	}
+	$form['service'] = array(
+    '#type' => 'select',
+    '#title' => t("Service"),
+    '#options' => $names,
+    '#default_value' => 1,
+    '#required' => true,
+	);
+	$form['confirm'] = array(
+  '#type' => 'checkbox',
+	'#required' => true,
+  '#title' => t('Confirm.'),
+	);
+	$form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Add Service',
+	);
+
+	return $form;
+}
+
+
+
+function vstaff_adjust_form($form_state = array()) {
+	global $user;
+	$user = vsystem_sync_user($user);
+	if ($user->balance <=0){
+		drupal_set_message("Please check your balance ",'error');
+		return drupal_goto('b/staff');
+	};
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("To Number"),
+    '#maxlength' => 10,
+    '#required' => true
+	);
+
+	//เบอรเสีย , เบอรหาย , โทรศัพทเสีย , โอนใหเพื่อน ญาติ พี่นอง ,
+	//โอนใหลูกคา , อื่นๆ
+	$ftype['1'] = 'เพิ่ม/Add +';
+	$ftype['2'] = 'ลด/Del -';
+
+	$form['ftype'] = array(
+	'#type' => 'select',
+	'#title' => t("Type"),
+	'#options' => $ftype,
+    '#default_value' => '0',
+     '#required' => true,
+                '#prefix' => '<table><tr><td width=\'10%\'>',
+                '#suffix' => '</td>',    
+	);
+	$form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Amount"),
+    '#default_value' => '0',
+    '#maxlength' => 10,
+    '#required' => true,
+                '#prefix' => '<td>',
+                '#suffix' => '</td></tr></table>',
+	);
+
+	$r = vstaff_ref1_adj();
+	//$a['0']='โปรดเลือก';
+	//$r = array_merge($a, $b);
+	//asort($r);
+
+	$form['ref1'] = array(
+	'#type' => 'select',
+	'#title' => t("Reson"),
+	'#options' => $r,
+    '#default_value' => '0',
+     '#required' => true,
+	);
+	$form['remark'] = array(
+    '#type' => 'textfield',
+    '#title' => t("remark"),
+    '#maxlength' => 255,
+    '#required' => false,
+     '#required' => true,
+	);
+
+	$form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Adjust',
+	);
+
+	return $form;
+}
+
+function vstaff_adjust_form_validate($form, &$form_state) {
+	global $user;
+	$user = vsystem_sync_user($user);
+	if ($user->balance <=0){
+		form_set_error('amount', 'Please check your balance.');
+	};
+//	if (!is_numeric($form_state['values']['username'])){
+//		form_set_error('username', 'Only Numeric.');
+//	}
+//	if (!is_numeric($form_state['values']['amount'])){
+//		form_set_error('amount', 'Only Numeric.');
+//	}else{
+		if ($form_state['values']['amount'] <= 0){
+			form_set_error('amount', 'Amount can\'t 0.');
+		};
+		if ($form_state['values']['amount'] > $user->balance){
+			form_set_error('amount', 'Please check your balance.');
+		};
+//	};
+}
+
+function vstaff_adjust_form_submit($form, &$form_state) {
+	global $user;
+	$staff = $user->name;
+	$user = vsystem_sync_user($user);
+	//print
+	if ((strlen($form_state['values']['username']) > 0) AND (strlen($form_state['values']['amount']) > 0) )
+	if($user->balance > $form_state['values']['amount']){
+		if ($form_state['values']['ftype']==1){
+			$fuser = $staff;
+			$tuser=$form_state['values']['username'];
+		}else{
+			$fuser=$form_state['values']['username'];
+			$tuser = $staff;
+		}
+		$result = db_query("SELECT a_i_pay_by('%s','%s',%d,'%s','%s',4,'%s') As cpay ;",
+		$fuser,$tuser,
+		$form_state['values']['amount']*100,'Agent:'.$staff,$form_state['values']['ref1'],$form_state['values']['remark']);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("Adjust ".$form_state['values']['amount']." Fail.",'error');
+			return drupal_goto('b/staff/ckuser/'.$form_state['values']['username']);
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("Adjust ".$form_state['values']['amount']." Success.");
+				return drupal_goto('b/staff/ckuser/'.$form_state['values']['username']);
+			}else{
+				drupal_set_message("Adjust ".$form_state['values']['amount']." Fail. ".$card_lot->cpay,'error');
+				return drupal_goto('staff/ckuser/'.$form_state['values']['username']);
+			};
+		};
+	};
+
+	drupal_set_message(" Credit not enough.",'error');
+	return drupal_goto('b/staff/adjust');
+
+}
+
+
+function vstaff_staff_transfer_form($form_state = array()) {
+	$resource = db_query("select name from {users} order by name");
+	$results = array();
+	while ($row = db_fetch_array($resource)) $r[$row['name']] = $row['name'];
+	$form['username'] = array(
+	'#type' => 'select',
+	'#title' => t("Transfer To"),
+	'#options' => $r,
+	'#required' => true
+	);
+
+	$form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Amount"),
+    '#default_value' => '0',
+    '#maxlength' => 10,
+    '#required' => true
+	);
+
+	$form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Transfer',
+	);
+
+	return $form;
+}
+
+function vstaff_staff_transfer_form_validate($form, &$form_state) {
+	global $user;
+	$user = vsystem_sync_user($user);
+	//print $form_state['values']['username'];
+	//die;
+	if ($user->balance <=0){
+		form_set_error('amount', 'Please check your balance.');
+	};
+//	if (!is_numeric($form_state['values']['amount'])){
+//		form_set_error('amount', 'Only Numeric.');
+//	}else{
+		if ($form_state['values']['amount'] <= 0){
+			form_set_error('amount', 'Amount can\'t 0.');
+		};
+		if ($form_state['values']['amount'] > $user->balance){
+			form_set_error('amount', 'Please check your balance.');
+		};
+//	};
+}
+
+function vstaff_staff_transfer_form_submit($form, &$form_state) {
+	global $user;
+	$staff = $user->name;
+	$user = vsystem_sync_user($user);
+	//print
+	if ((strlen($form_state['values']['username']) > 0) AND (strlen($form_state['values']['amount']) > 0) )
+	if($user->balance > $form_state['values']['amount']){
+		$result = db_query("SELECT a_i_pay_by('%s','%s',%d,'%s','%s',5,'') As cpay ;",
+		$staff,$form_state['values']['username'],
+		$form_state['values']['amount']*100,'Agent:'.$staff,'');
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("Transfer ".$form_state['values']['amount']." Fail.",'error');
+			return drupal_goto('staff/detail/'.$form_state['values']['username']);
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("Transfer ".$form_state['values']['amount']." Success.");
+				return drupal_goto('staff/detail/'.$form_state['values']['username']);
+			}else{
+				drupal_set_message("Transfer ".$form_state['values']['amount']." Fail. ".$card_lot->cpay,'error');
+				return drupal_goto('staff/detail/'.$form_state['values']['username']);
+			};
+		};
+	};
+
+	drupal_set_message(" Credit not enough.",'error');
+	return drupal_goto('b/staff/stafftransfer');
+}
+
+
+function vstaff_transfer_form($form_state = array(),$id = NULL) {
+	$form['fromuser'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Transfer From Number"),
+    '#maxlength' => 10,
+	'#default_value' => $id,
+    '#required' => true
+	);
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("To Number"),
+    '#maxlength' => 10,
+    '#required' => true
+	);
+
+	$form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Amount"),
+    '#default_value' => '0',
+    '#maxlength' => 10,
+    '#required' => true
+	);
+	//เบอรเสีย , เบอรหาย , โทรศัพทเสีย , โอนใหเพื่อน ญาติ พี่นอง ,
+	//โอนใหลูกคา , อื่นๆ
+
+	$r = vstaff_ref1();
+	$form['ref1'] = array(
+	'#type' => 'select',
+	'#title' => t("Remark"),
+	'#options' => $r,
+	'#required' => true,
+	);
+
+	$form['remark'] = array(
+    '#type' => 'textfield',
+    '#title' => t("remark"),
+    '#maxlength' => 255,
+    '#required' => false,
+     '#required' => true,
+	);
+
+	$form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Transfer',
+	);
+
+	return $form;
+}
+
+function vstaff_transfer_form_validate($form, &$form_state) {
+
+//	if (!is_numeric($form_state['values']['fromuser'])){
+//		form_set_error('username', 'Only Numeric.');
+//	}
+//	if (!is_numeric($form_state['values']['username'])){
+//		form_set_error('username', 'Only Numeric.');
+//	}
+//	if (!is_numeric($form_state['values']['amount'])){
+//		form_set_error('amount', 'Only Numeric.');
+//	}else{
+		if ($form_state['values']['amount'] < 1){
+			form_set_error('amount', 'Amount can\'t 0.');
+		};
+//	};
+}
+
+function vstaff_transfer_form_submit($form, &$form_state) {
+	global $user;
+	//        print_r($user);
+	//       die;
+	$staff = $user->name;
+	$user->name=$form_state['values']['fromuser'];
+	$user = vsystem_sync_user($user);
+	//print
+	if ((strlen($form_state['values']['username']) > 0) AND (strlen($form_state['values']['amount']) > 0) )
+	if($user->balance >= $form_state['values']['amount']){
+		$result = db_query("SELECT a_i_pay_by('%s','%s',%d,'%s','%s',3,'%s') As cpay ;",
+		$form_state['values']['fromuser'],$form_state['values']['username'],
+		$form_state['values']['amount']*100,'Agent:'.$staff,$form_state['values']['ref1'],$form_state['values']['remark']);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("Transfer ".$form_state['values']['amount']." Fail.",'error');
+			return drupal_goto('staff/detail/'.$form_state['values']['username']);
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("Transfer ".$form_state['values']['amount']." Success.");
+				return drupal_goto('staff/detail/'.$form_state['values']['username']);
+			}else{
+				drupal_set_message("Transfer ".$form_state['values']['amount']." Fail. ".$card_lot->cpay,'error');
+				return drupal_goto('staff/detail/'.$form_state['values']['username']);
+			};
+		};
+	};
+
+	drupal_set_message(" Credit not enough.",'error');
+	return drupal_goto('b/staff/transfer/'.$form_state['values']['fromuser']);
+
+}
+
+
+function vstaff_check_user($duser=NULL) {
+	if (!$duser){
+		$output = drupal_get_form('vstaff_form_overview');
+		$search_str =$_SESSION['vstaff_search_filter'];
+	}else{
+		$search_str = $duser;
+	}
+	//$username = $search_str;
+//	if (!is_numeric($search_str)){
+//		drupal_set_message("Only Digits..");
+//		return $output;
+//	};
+
+	$header = array(
+	array('data' => t('Username'), 'field' => 'name'),
+	array('data' => t('Password'), 'field' => 'secret'),
+	array('data' => t('Lang'), 'field' => 'language'),
+	array('data' => t('Balance'), 'field' => 'balance'),
+	array('data' => t('Rate'), 'field' => 'description'),
+	//array('data' => t('Currency'), 'field' => 'currencysym'),
+	array('data' => t('Expire Date'), 'field' => 'exp_date'),
+	array('data' => t('Status'), 'field' => 'status'),
+	array('data' => t('Create By'), 'field' => 'create_by'),
+	array('data' => t('Operation'), ""),
+	);
+
+	$tablesort = tablesort_sql($header);
+	//    $search_str = $_SESSION['vstaff_search_filter'];
+	$sql = "select * from dr_users where uid >1 ";
+	$sql_count = "select 1 from dr_users where uid >1 ";
+	if ($search_str != '') {
+		$sql .= " AND name LIKE '$search_str%' ";
+		$sql_count .= " ";
+	}else
+	$sql .= " ";
+
+
+	//echo $sql;
+	//    $result = pager_query($sql . $tablesort, $sql_count);
+	$result = pager_query($sql . $tablesort, 1,0,$sql_count);
+	while ($rate = db_fetch_object($result)) {
+		$udetail->name=$rate->name;
+		$username=$rate->name;
+		$udetail=vsystem_sync_user($udetail);
+		$r = db_query_range('SELECT a_group_desc(%d) as grpdesc',$rate->grpid, 0, 1);
+		$n = db_fetch_object($r);
+		if (strlen($rate->create_by)==0){
+			$cbstr = 'IVR';
+		}else{
+		 $cbstr = $rate->create_by;
+		};
+		if ($rate->status==1){
+			$status='Enable';
+		}else{
+			$status='Disable';
+		}
+
+                if (user_access('Lock Card/User')){
+                    $lock_str = l("Lock/Unlock","b/staff/lockuser/".$rate->name);
+                }else{
+                    $lock_str = '';
+                }
+		$rows[] =
+		array(
+		// Cells
+		$rate->name,
+		$rate->plainpass,
+		$udetail->lang,
+		number_format($udetail->balance,2,'.',','),
+		$n->grpdesc,
+		//$udetail->currency,
+		$rate->exp_date,
+		$status,
+		$cbstr,
+		l("Edit","b/staff/edit/".$rate->name)."|".l("TopUp","b/staff/topup/".$rate->name),
+		$lock_str
+
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 1, 0);
+	/*  Service
+	 $output .= '<br><br><b>Service: </b>'.l("Add/Renew Service","b/staff/service/".$search_str).'<br>';
+	 $header3 = array(
+	 array('data' => t('Service'), 'field' => 'description'),
+	 array('data' => t('Expire Date'), 'field' => 'expire'),
+	 array('data' => t('Price'), 'field' => 'price'),
+	 );
+
+	 $sql = "   SELECT *,fdate1(expire) as cdate from vservice where username='$username'   ";
+	 $sql_count = "select count(username) from vservice where username='$username'";
+
+	 $tablesort = tablesort_sql($header3);
+	 $result = pager_query($sql . $tablesort, 10,0,$sql_count);
+	 while ($data = db_fetch_object($result)) {
+		$rows3[] =
+		array(
+		$data->description,
+		$data->cdate,
+		number_format($data->price,2,'.',',').' / '.$data->day.' days',
+		);
+		}
+
+		if (!$rows3) {
+		$rows3[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+		}
+		$output .= theme('table', $header3, $rows3);
+		$output .= theme('pager', NULL, 10, 0);
+
+		*/
+	$output .= drupal_get_form('date_form');
+		
+	$output .= '<b>Top up / Adjust / Transfer History:</b><br>';
+	//Number , Transfer from , Transfer to , Adjust , Top up, Date , PIN
+	$header2 = array(
+	array('data' => t('Number'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'date','sort'=>'desc'),
+	array('data' => t('Topup'), 'field' => 'paid'),
+	array('data' => t('Transfer'), 'field' => 'paid'),
+	array('data' => t('Adjust'), 'field' => 'paid'),
+	array('data' => t('Pin'), 'field' => 'ref'),
+	array('data' => t('Transfer From'), 'field' => 'ref'),
+	array('data' => t('Transfer To'), 'field' => 'ref'),
+	array('data' => t('Process By'), 'field' => 'process_by'),
+	array('data' => t('Resaon'), 'field' => 'ref1'),
+	array('data' => t('Remark'), 'field' => 'remark'),
+	);
+	if ($_SESSION['vreport_date1_filter']){
+    	    $paymentdatesearch = " and vpayment.date > timestamp '".$_SESSION['vreport_date1_filter']."'";        
+    	    $paymentdatesearch .= " and vpayment.date < timestamp '".$_SESSION['vreport_date2_filter']."'";
+        }else{
+            $paymentdatesearch = " 0=0 ";
+        }
+	$sql = "   SELECT *,fdate1(date) As fdate from vpayment where username='$username' ".$paymentdatesearch;
+	$sql_count = "select count(username) from vpayment where username='$username' ".$paymentdatesearch;
+
+	$tablesort = tablesort_sql($header2);
+	$result = pager_query($sql . $tablesort, 10,0,$sql_count);
+	while ($rate = db_fetch_object($result)) {
+		if (strlen($rate->process_by)==0){
+			$pbstr = 'IVR';
+		}else{
+			$pbstr =  $rate->process_by;
+		}
+		$topup = '';
+		$transfer = '';
+		$adjust = '';
+		$rem = '';
+		$pin='';
+		$tfrom='';
+		$tto='';
+		if ($rate->ptype==1){
+			$pin = $rate->ref;
+		};
+		if ($rate->ptype > 1){
+			if ($rate->paid < 0){
+				$tfrom = $rate->username;
+				$tto = $rate->ref;
+			}else{
+				$tto = $rate->username;
+				$tfrom = $rate->ref;
+			};
+		};
+		//echo $tform;
+		if ($rate->ptype == 1){
+			$topup = number_format($rate->paid/100,2,'.',',');
+		}
+		if ($rate->ptype == 2){
+			$transfer = number_format($rate->paid/100,2,'.',',');
+		}
+		if ($rate->ptype == 3){
+			$transfer = number_format($rate->paid/100,2,'.',',');
+			$rem = vstaff_ref1($rate->ref1);
+		}
+		if ($rate->ptype == 4){
+			$adjust = number_format($rate->paid/100,2,'.',',');
+			$rem=vstaff_ref1_adj($rate->ref1);
+			// echo ($rem);
+		}
+		//echo vstaff_ref1_adj(7);
+		$rows2[] =
+		array(
+		$rate->username,
+		$rate->fdate,
+		$topup,
+		$transfer,
+		$adjust,
+		$pin,
+		$tfrom,
+		$tto,
+		$pbstr,
+		$rem,
+		$rate->remark,
+		);
+	}
+
+	if (!$rows2) {
+		$rows2[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header2, $rows2);
+	$output .= theme('pager', NULL, 10, 0);
+
+	$output .= '<br><br><b>Call history:</b><br>';
+	// Start , Stop , Number , Called Number , Destination , Rate , Sec , Min , Rate Inc. VAT , Total
+	//, Service charge , Provider , Hang-up Cause
+
+	$header1 = array(
+	array('data' => t('Start'), 'field' => 'acctstarttime','sort' => 'desc'),
+	array('data' => t('Stop'), 'field' => 'acctstoptime'),
+	array('data' => t('Account[Sub Account]'), 'field' => 'username'),
+	array('data' => t('Called Number'), 'field' => 'calledstationid'),
+	array('data' => t('Destination'), 'field' => 'tariffdesc'),
+	array('data' => t('Rate'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'duration'),
+	array('data' => t('Total'), 'field' => 'cost'),
+	array('data' => t('Service <br>Charge'), 'field' => 'Service charge'),
+	array('data' => t('Provider'), 'field' => 'provider'),
+	array('data' => t('Hangup Cause'), 'field' => 'hangup_cause'),
+	);
+	if ($_SESSION['vreport_date1_filter']){
+    	    $cdrdatesearch = " and acctstarttime > timestamp '".$_SESSION['vreport_date1_filter']."'";        
+    	    $cdrdatesearch .= " and acctstarttime < timestamp '".$_SESSION['vreport_date2_filter']."'";
+        }else{
+            $cdrdatesearch = " 0=0 ";
+        }
+
+	$sql = " SELECT username,date_trunc('second',acctstarttime) as cdate, date_trunc('second',(acctstarttime  +  (duration * '1 second'::interval))) as stop, callingstationid,calledstationid,tariffdesc,price,duration,
+  cost,o_service_charge,provider,provider_id,hangup_cause from voipcall Where (username = '$username' Or callingstationid='$username') ".$cdrdatesearch;
+
+	$tablesort = tablesort_sql($header1);
+	$sql_count = "Select count(username) from voipcall Where (username = '$username' Or callingstationid='$username') ".$cdrdatesearch;
+	$result = pager_query($sql . $tablesort, 40,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows1[] =
+		array(
+		$rate->cdate,
+		$rate->stop,
+		$rate->username.' ['.$rate->callingstationid.' ]',
+		$rate->calledstationid,
+		$rate->tariffdesc,
+		$rate->price,
+		gmdate("H:i:s", $rate->duration),
+		$rate->cost,
+		$rate->o_service_charge,
+		l($rate->provider,'b/provider/gateway/'.$rate->provider_id),
+		$rate->hangup_cause,
+		);
+	}
+
+	if (!$rows1) {
+		$rows1[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header1, $rows1);
+	$output .= theme('pager', NULL, 40, 0);
+
+	return $output;
+}
+
+function vstaff_topup_form($form_state,$name=NULL) {
+	global $user;
+	$form['username'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Number"),
+        '#maxlength' => 10,
+	'#default_value' => $name,
+        '#required' => true,
+	);
+
+	$form['tpin'] = array(
+    '#type' => 'textfield',
+    '#title' => t("TopUP From PIN"),
+    '#default_value' => '',
+    '#maxlength' => 10,
+    '#required' => true,
+	);
+
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'TopUp',
+	);
+
+	return $form;
+}
+
+function vstaff_topup_form_validate($form, &$form_state) {
+	if ($form_state['values']['username'] != 'admin'){
+//		if (!is_numeric($form_state['values']['username'])){
+//			form_set_error('username', 'Only Numeric.');
+//		}
+		if (!is_numeric($form_state['values']['tpin'])){
+			form_set_error('tpin', 'Only Numeric.');
+		}
+	};
+}
+
+function vstaff_topup_form_submit($form, &$form_state) {
+	global $user;
+	if ((strlen($form_state['values']['username']) > 0) && (strlen($form_state['values']['tpin']) > 0)) {
+		$result = db_query("SELECT a_card_pay_by('%s','%s','%s') As cpay ;", $form_state['values']['tpin'],$form_state['values']['username'],'Agent:'.$user->name);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("TopUp From ".$form_state['values']['tpin']." Fail.",'error');
+			return drupal_goto('staff');
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("TopUp From ".$form_state['values']['tpin']." Success.");
+				return drupal_goto('staff');
+			}else{
+				drupal_set_message("TopUp From ".$form_state['values']['tpin']." Fail. ".$card_lot->cpay,'error');
+				return drupal_goto('staff');
+			};
+		};
+	};
+
+	drupal_set_message(" Please inou PIN Fail.",'error');
+	return drupal_goto('staff');
+}
+
+function vstaff_confirm_delete(&$form_state, $id=null) {
+	if (!$id) {
+		return drupal_goto('staff');
+	}
+	//drupal_set_message("ID: ".$id);
+	//$account = user_load(array('name' => $id, 'status' => 1));
+	$form['_account'] = array('#type' => 'value', '#value' => $id);
+
+	return confirm_form($form,
+	t('Are you sure you want to delete the account %name?', array('%name' => $id)),
+    'staff',
+	t('All submissions made by this user will be attributed to the anonymous account. This action cannot be undone.'),
+	t('Delete'), t('Cancel'));
+}
+
+function vstaff_confirm_delete_submit($form, &$form_state) {
+	//user_delete($form_state['values'], $form_state['values']['_account']->uid);
+	if ($form['confirm']) {
+		$acc = $form_state['values']['_account'];
+		db_query("delete from dr_users where name='%s'",$acc);
+		drupal_set_message($acc." has been deleted.");
+	}
+	if (!isset($_REQUEST['destination'])) {
+		$form_state['redirect'] = 'staff';
+	}
+}
+
+function vstaff_load($tuser) {
+	global $user;
+	$result = db_query("SELECT * FROM {users} u WHERE name='%s'", $tuser);
+
+	if (db_num_rows($result)) {
+		$user = db_fetch_object($result);
+		$user = drupal_unpack($user);
+
+		$user->roles = array();
+		if ($user->uid) {
+			$user->roles[DRUPAL_AUTHENTICATED_RID] = 'authenticated user';
+		}
+		else {
+			$user->roles[DRUPAL_ANONYMOUS_RID] = 'anonymous user';
+		}
+		$result = db_query('SELECT r.rid, r.name FROM {role} r INNER JOIN {users_roles} ur ON ur.rid = r.rid WHERE ur.uid = %d', $user->uid);
+		while ($role = db_fetch_object($result)) {
+			$user->roles[$role->rid] = $role->name;
+		}
+		user_module_invoke('load', $array, $user);
+	}
+	else {
+		$user = FALSE;
+	}
+
+	return $user;
+}
+
+function vstaff_create_account($username = NULL,$password = NULL,$secret) {
+	//echo $username.' Pass: '.$password.' Email:'.$email;
+	if ($secret=="mypass") {
+		$sqlstr = "SELECT * FROM {users}  WHERE name = '$username'";
+		$result = db_query($sqlstr);
+		$ck = db_fetch_object($result);
+		// admin uid = 1
+		if ($ck->uid > 1 ){
+			db_query("UPDATE {users} set pass=md5('%s'),plainpass='%s' where name='%s'",$password,$password,$username);
+			//echo 2;
+		}else{
+			//echo $ck->uid;
+			user_save(array ('name' => $username,'uid' => $ck->uid),array ('uid' => $ck->uid,'name' => $username,'pass' => $password,'status' => 1));
+			//echo 1;
+		};
+	}else{
+		//echo -1;
+	};
+};
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vstaff_cron() {
+	//  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+	//  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vstaff_user($op, &$edit, &$user) {
+
+}
+function vstaff_form_search() {
+	if (empty($_SESSION['vstaff_search_main'])) {
+		$_SESSION['vstaff_search_filter'] = '';
+	}
+	$form['filter_group'] = array('#type' => 'fieldset',
+    '#title' => t('Search'),
+    '#prefix' => '<div class="container-inline">',
+    '#suffix' => '</div>',
+	);
+	$form['filter_group']['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vstaff_search_main']
+	);
+	$form['filter_group']['type'] = array(
+    '#type' => 'radios',
+    '#title' => 'Type',
+	'#default_value' => 0,
+	'#options' => array(t('Member'), t('Card')),
+	);
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Search'));
+	return $form;
+}
+
+function vstaff_form_overview() {
+	if (empty($_SESSION['vstaff_search_filter'])) {
+		$_SESSION['vstaff_search_filter'] = '';
+	}
+	$form['filter_group'] = array('#type' => 'fieldset',
+    '#title' => t('Search'),
+    '#prefix' => '<div class="container-inline">',
+    '#suffix' => '</div>',
+	);
+	$form['filter_group']['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#default_value' => $_SESSION['vstaff_search_filter']
+	);
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Search'));
+	return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vstaff_overview($duser=NULL) {
+
+	$output = drupal_get_form('vstaff_form_overview');
+	//username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+	$header = array(
+	array('data' => t('Username'), 'field' => 'name'),
+	array('data' => t('Password'), 'field' => 'plainpass'),
+	//array('data' => t('Balance'), 'field' => 'balance'),
+	array('data' => t('Rate'), 'field' => 'description'),
+	array('data' => t('Create By'), 'field' => 'create_by'),
+	array('data' => t('Created'), 'field' => 'exp_date'),
+	//array('data' => t('Currency'), 'field' => 'currencysym'),
+	//array('data' => t('Prefix'), 'field' => 'prefix'),
+	//array('data' => t('Expire Date'), 'field' => 'exp_date'),
+	//array('data' => t('Owner'), 'field' => 'owner'),
+	// exp_date
+	//array('data' => t('')),
+	//array('data' => t('')),
+	//array('data' => t('')),
+	array('data' => t('Action')),
+	);
+
+	$tablesort = tablesort_sql($header);
+	if (!$duser){
+		$search_str = $_SESSION['vstaff_search_filter'];
+	}else{
+		$search_str = $duser;
+	}
+	$sql_count = "select count(uid) from dr_users where uid >1 ";
+	$sql = "SELECT *,voiptariffgrp.description
+     FROM dr_users As d
+              LEFT JOIN voiptariffgrp ON grpid = voiptariffgrp.id
+                WHERE d.uid > 1 ";
+	if ($search_str != '') {
+		$sql .= " AND name LIKE '$search_str%'";
+		$sql_count .= " AND name LIKE '$search_str%' Limit 1";
+	}else {
+		$sql .= " AND name LIKE 'not_display_by_default'";
+		$sql_count .= " AND name LIKE 'not_display_by_default' Limit 1";
+	};
+	//echo $sql;
+	$tablesort = tablesort_sql($header);
+	//$result = pager_query($sql . $tablesort, 1);
+	$result = pager_query($sql . $tablesort, 10,0,"select 10");
+	while ($rate = db_fetch_object($result)) {
+		if (user_access('Lock Card/User')){
+			$dstr = '  |  '.l('Delete','staff/delete/'.$rate->name);
+		}else{
+			$dstr = '';
+		};
+		if (strlen($rate->create_by)==0){
+			$cbstr = 'IVR';
+		}else{
+		 $cbstr = $rate->create_by;
+		};
+		$rows[] =
+		array(
+		// Cells
+		array('data' => l($rate->name,'b/staff/ckuser/'.$rate->name)),
+		$rate->plainpass,
+		// $rate->balance,
+		$rate->description,
+		//$rate->currencysym,
+		//$rate->prefix.'#',
+		$cbstr,
+		date("d-m-Y g:i a",$rate->created),
+		//$rate->owner,
+		//array('data' => l('CDR','staff/cdr/'.$rate->name)),
+		//array('data' => l('Payment','staff/detail/'.$rate->name).'  <br>'.l('Add Credit','payment/add/'.$rate->name)),
+		//array('data' => l('Payment','staff/detail/'.$rate->name)),
+		array('data' => l('Edit','staff/edit/'.$rate->name).$dstr),
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 1));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 10, 0);
+
+	return $output;
+}
+
+function vstaff_form_search_submit($form, &$form_state) {
+	//$_SESSION['vstaff_search_main'] = $form_state['values']['search'];
+	//echo $form_state['values']['search'];
+	//echo $form_state['values']['type'];
+	if (strlen($form_state['values']['search'])>0){
+		if ($form_state['values']['type']==0)
+		return drupal_goto('b/staff/ckuser/'.$form_state['values']['search']);
+		if ($form_state['values']['type']==1)
+		return drupal_goto('b/staff/card_check/'.$form_state['values']['search']);
+	}
+}
+
+
+function vstaff_form_overview_submit($form, &$form_state) {
+	$_SESSION['vstaff_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vstaff_get_vstaff_group() {
+	$types = array();
+
+	$result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+	while ($object = db_fetch_object($result)) {
+		$types[] = array($object->id => $object->description);
+	}
+
+	return $types;
+}
+
+function vstaff_detail($username = NULL) {
+	//$udetail = array();
+	$udetail->name = $username;
+	$udetail = vsystem_sync_user($udetail);
+
+	//$result = db_query("SELECT balance,currencysym from vstaff where username='%s'",$username);
+	//$udetail = db_fetch_object($result);
+
+	$output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currency;
+	$output .= '<br><br><b>Payment:</b><br>';
+	$header = array(
+	array('data' => t('Username'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'date','sort'=>'desc'),
+	array('data' => t('Amount'), 'field' => 'paid'),
+	array('data' => t('Ref'), 'field' => 'ref'),
+	);
+
+	$sql = "   SELECT * from vpayment where name='$username'   ";
+	$sql_count = "select count(username) from vpayment where name='$username'";
+	$tablesort = tablesort_sql($header);
+	$result = pager_query($sql . $tablesort, 10,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->name,
+		$rate->date,
+		$rate->paid/100,
+		$rate->ref,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 10, 0);
+
+	return $output;
+}
+
+function vstaff_cdr($username = NULL) {
+
+	$udetail->name = $username;
+	$udetail=vsystem_sync_user($udetail);
+	$output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currency;
+	$output .= '<br><br><b>Payment:</b><br>';
+
+	//  $sql = " SELECT username,acctstarttime,calledstationid,tariffdesc,price,duration,cost,currencysym from voipcall Where username = '$username' ";
+	//  $sql_count = "select count(username) from voipcall where username='$username'";
+
+
+	$header = array(
+	array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+	array('data' => t('Username'), 'field' => 'username'),
+	array('data' => t('Account'), 'field' => 'callingstationid'),
+	array('data' => t('Number'), 'field' => 'calledstationid'),
+	array('data' => t('Destination'), 'field' => 'tariffdesc'),
+	array('data' => t('Rate'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'duration'),
+	array('data' => t('Total'), 'field' => 'cost'),
+	array('data' => t('Currency'), 'field' => 'currencysym'),
+	);
+	$sql = " SELECT username,acctstarttime,callingstationid,calledstationid,tariffdesc,price,duration,
+  cost,currencysym from voipcall Where username = '$username' Or callingstationid = '$username' ";
+	$sql_count = "Select count(username) from voipcall Where username = '$username' Or callingstationid = '$username'";
+	echo $sql;
+	$tablesort = tablesort_sql($header);
+	$result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->acctstarttime,
+		$rate->username,
+		$rate->callingstationid,
+		$rate->calledstationid,
+		$rate->tariffdesc,
+		$rate->price,
+		$rate->duration,
+		$rate->cost,
+		$rate->currencysym,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+	return $output;
+}
+
+function vstaff_form($form_state = array(),$id = NULL) {
+	if ($username) {
+		$result = db_query("SELECT id FROM dr_users  WHERE name = '%s'", $id);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			return drupal_goto('staff');
+		}
+	}
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Create New Member"),
+    '#maxlength' => 10,
+    '#required' => true,
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+function vstaff_form_validate($form, &$form_state) {
+//	if (!is_numeric($form_state['values']['username'])){
+//		form_set_error('username', 'Only Numeric.');
+//	}
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vstaff_form_submit($form, &$form_state) {
+	global $user;
+	$result = db_query("SELECT create_account_mobile('%s');", $form_state['values']['username']);
+	$card_lot = db_fetch_object($result);
+	if ($card_lot) {
+		if ($card_lot->create_account_mobile > 0 ) {
+			$_SESSION['vstaff_search_filter'] = $form_state['values']['username'];
+			$result = db_query("update dr_users set create_by='%s' where name='%s';",'Agent:'.$user->name, $form_state['values']['username']);
+			drupal_set_message("Successfull Password is   '$card_lot->create_account_mobile' ");
+		}else{
+			drupal_set_message($form_state['values']['username']." has already been taken ");
+
+		};
+	}
+	return drupal_goto('staff/'.$form_state['values']['username']);
+}
+
+function vstaff_edit_form($form_state = array(),$id = NULL) {
+	global $user;
+	$user = vsystem_sync_user($user);
+	$muser->name = $id;
+	$muser = vsystem_sync_user($muser);
+	//    print_r($muser);
+	//    die;
+	if (!$id) {
+		return drupal_goto('staff');
+	}
+	$udetail->name=$id;
+	$udetail=vsystem_sync_user($udetail);
+	if (!$udetail->balance)
+	$udetail->balance = 0;
+	$sqlstr = "SELECT *,vuid as accountid,plainpass As secret FROM dr_users  WHERE name = '$id'";
+	$result = db_query($sqlstr);
+	$card_lot = db_fetch_object($result);
+	$form['accountid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Account ID"),
+    '#default_value' => $card_lot->accountid,
+    '#required' => true,
+	//    '#disabled' => true,
+	'#attributes' => array('readonly' => 'readonly','class' => 'tuxza-disabled'),
+	);
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->name,
+    '#maxlength' => 255,
+	//    '#disabled' => true,
+    '#required' => true,
+	'#attributes' => array('readonly' => 'readonly','class' => 'tuxza-disabled'),
+	);
+
+	$form['secret'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t("Password"),
+	    '#default_value' => $card_lot->secret,
+	    '#required' => true,
+	    '#maxlength' => 10,
+	);
+	$form['m_acct'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t("Master Account"),
+	    '#default_value' => $card_lot->m_acct,
+	    '#required' => false,
+	    '#maxlength' => 20,
+	);
+
+	$l = array();
+	$l['ar']='ar';
+	$l['en']='en';
+	$l['th']='th';
+	$l['km']='km';
+	$l['in']='in';
+	$form['lang'] = array(
+    '#type' => 'select',
+    '#title' => t("Language"),
+	'#options' => $l,
+    '#default_value' => $muser->lang,
+    '#required' => true,
+	);
+	$form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Email"),
+    '#default_value' => $card_lot->mail,
+    '#required' => false,
+	);
+	$form['balance'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Balance"),
+    '#default_value' => $udetail->balance,
+    '#required' => true,
+	//'#disabled' => true,
+	'#attributes' => array('readonly' => 'readonly','class' => 'tuxza-disabled'),
+	);
+
+	$types = array();
+	$result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+	while ($object = db_fetch_object($result)) {
+		$names[$object->id] = $object->description;
+	}
+	$form['grpid'] = array(
+    '#type' => 'select',
+    '#title' => t("rate"),
+    '#options' => $names,
+    '#default_value' => $card_lot->grpid,
+    '#required' => true,
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+function vstaff_edit_form_validate($form, &$form_state) {
+	if (!is_numeric($form_state['values']['secret'])){
+		form_set_error('secret', 'Only Numeric.');
+	}
+	if (strlen($form_state['values']['secret']) < 5){
+		form_set_error('secret', 'Password Minimum 4 digits.');
+	}
+	if (strlen($form_state['values']['m_acct']) >0 ){
+	    //check master account
+		global    $memcache;
+		$get_result = $memcache->get('user:'.$form_state['values']['m_acct']);
+		if ($get_result==False)
+		    form_set_error('m_acct', 'Master Account Not Found.'.$get_result);
+	}
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vstaff_edit_form_submit($form, &$form_state) {
+	if ($form['accountid'] > 0)  {
+		$result = db_query("update dr_users set m_acct='%s',grpid=%s,mail='%s',plainpass = '%s',pass=MD5('%s') where name = '%s';",
+		$form_state['values']['m_acct'],$form_state['values']['grpid'],$form_state['values']['email'],$form_state['values']['secret'],$form_state['values']['secret'],$form_state['values']['username']);
+		$card_lot = db_fetch_object($result);
+		global    $memcache;
+		$get_result = $memcache->get('user:'.$form_state['values']['username']);
+		$obj = json_decode($get_result);
+		$obj->lang = $form_state['values']['lang'];
+		$obj->plainpass = $form_state['values']['secret'];
+		$obj->email = $form_state['values']['email'];
+
+		//echo json_encode($obj);
+		$get_result = $memcache->set('user:'.$form_state['values']['username'],json_encode($obj));
+		//die;
+	};
+	return drupal_goto('staff');
+}
+function date_form() {
+
+	if (empty($_SESSION['vreport_date1_filter'])) {
+		$_SESSION['vreport_date1_filter'] = date('Y-m-d 00:00');
+	}
+	if (empty($_SESSION['vreport_date2_filter'])) {
+		$_SESSION['vreport_date2_filter'] = date('Y-m-d H:i');
+	}
+	$form['filter_group'] = array('#type' => 'fieldset',
+            '#prefix' => '<div class="container-inline">',
+            '#suffix' => '</div>',
+	);
+	$format = 'Y-m-d H:i';
+
+	$form['filter_group']['date1'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'Start from',
+     '#default_value' => $_SESSION['vreport_date1_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 1, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '-3:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+	);
+	$form['filter_group']['date2'] = array(
+     '#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+     '#title' => 'To',
+     '#default_value' => $_SESSION['vreport_date2_filter'],
+     '#date_format' => $format,
+     '#date_label_position' => 'within', // See other available attributes and what they do in date_api_elements.inc
+     '#date_timezone' => 'Asia/Bangkok', // Optional, if your date has a timezone other than the site timezone.
+     '#date_increment' => 1, // Optional, used by the date_select and date_popup elements to increment minutes and seconds.
+     '#date_year_range' => '0:0', // Optional, used to set the year range (back 3 years and forward 3 years is the default).
+	);
+	/*
+	 $form['filter_group']['search'] = array(
+	 '#type' => 'textfield',
+	 '#title' => 'Search',
+	 '#size' => 20,
+	 '#default_value' => $_SESSION['vreport_search_filter']
+	 );
+	 */
+	$form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+	//    $form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+function date_form_submit($form, &$form_state) {
+	//	$_SESSION['vreport_search_filter'] = $form_state['values']['search'];
+	$_SESSION['vreport_date1_filter'] = $form_state['values']['date1'];
+	$_SESSION['vreport_date2_filter'] = $form_state['values']['date2'];
+}
+

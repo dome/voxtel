@@ -1,0 +1,38 @@
+? taxonomy_views_data.patch
+? taxonomy_views_data_v2.patch
+Index: modules/taxonomy.views.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/views/modules/taxonomy.views.inc,v
+retrieving revision 1.50.2.6
+diff -u -p -r1.50.2.6 taxonomy.views.inc
+--- modules/taxonomy.views.inc	1 Jul 2009 06:13:42 -0000	1.50.2.6
++++ modules/taxonomy.views.inc	9 Sep 2009 20:01:44 -0000
+@@ -125,6 +125,10 @@ function taxonomy_views_data() {
+     'sort' => array(
+       'handler' => 'views_handler_sort',
+     ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_string',
++      'help' => t('Taxonomy term name.'),
++    ),
+     'argument' => array(
+       'handler' => 'views_handler_argument_string',
+       'help' => t('Taxonomy term name.'),
+@@ -194,6 +198,17 @@ function taxonomy_views_data() {
+     ),
+   );
+ 
++  $data['term_node']['vid'] = array(
++    'title' => t('Node'),
++    'help' => t('Relate a term to the node tagged with that term.'),
++    'relationship' => array(
++      'handler' => 'views_handler_relationship',
++      'base' => 'node',
++      'base field' => 'vid',
++      'label' => t('node'),
++    ),
++  );
++
+   // tid field
+   $data['term_node']['tid'] = array(
+     'title' => t('Term ID'),

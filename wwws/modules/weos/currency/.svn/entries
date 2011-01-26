@@ -1,0 +1,94 @@
+8
+
+dir
+16
+http://c.tel.co.th/svn/tuxza2/trunk/www/modules/weos/currency
+http://c.tel.co.th/svn/tuxza2
+
+
+
+2009-03-29T14:36:42.859255Z
+2
+admin
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+3920dbfa-1320-47c5-88e9-72222b7a02cb
+
+LICENSE.txt
+file
+
+
+
+
+2009-06-15T06:22:40.000000Z
+998ed0c116c0cebfcd9b2107b0d82973
+2009-03-29T14:36:42.859255Z
+2
+admin
+
+translations
+dir
+
+currency_api
+dir
+
+INSTALL.txt
+file
+
+
+
+
+2009-06-15T06:22:40.000000Z
+8ebbd4545ab0504154eba7974bc036c5
+2009-03-29T14:36:42.859255Z
+2
+admin
+
+currency.info
+file
+
+
+
+
+2009-06-15T06:22:40.000000Z
+d488e4faee24554ba214e1e01cc7e63b
+2009-03-29T14:36:42.859255Z
+2
+admin
+
+README.txt
+file
+
+
+
+
+2009-06-15T06:22:40.000000Z
+3872cd2592ffa9c3aec79c92f0ec45bc
+2009-03-29T14:36:42.859255Z
+2
+admin
+
+currency.module
+file
+
+
+
+
+2009-06-15T06:22:40.000000Z
+3f5c92c427887b5bb92de6e42cfdd1f6
+2009-03-29T14:36:42.859255Z
+2
+admin
+

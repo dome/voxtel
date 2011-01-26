@@ -1,0 +1,411 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * A simple wspay module.
+ * Originally by Dries Butyaert. Maintained by Khalid Baheyeldin http://2bits.com
+ */
+
+define('WSPAY_HIDDEN',                 0);
+define('WSPAY_PUBLIC',                 1);
+
+define('WSPAY_PAGER',                  25);
+
+define('WSPAY_EMAIL',                  'wspay_email');
+define('WSPAY_STATE',                  'wspay_state');
+define('WSPAY_THANKS_TITLE',           'wspay_thanks_title');
+define('WSPAY_THANKS_DEFAULT_TITLE',   t('Thank You'));
+define('WSPAY_THANKS_TEXT',            'wspay_thanks_text');
+define('WSPAY_THANKS_DEFAULT_TEXT',    t('Thank you for your payment.'));
+define('WSPAY_DONORS_TEXT',            'wspay_donors_text');
+define('WSPAY_DONORS_DEFAULT_TEXT',    t('<ul><li><a href="/weos/wspay">Pay now</a>.</li><li><p>This page lists all donors.</li></ul>'));
+define ('WSPAY_DONATE_MESSAGE',        'wspay_donate_message');
+define ('WSPAY_DONATE_MESSAGE_DEFAULT_TEXT', t('Please make a payment.'));
+define ('WSPAY_CURRENCY_TEXT',         'wspay_currency_text');
+define ('WSPAY_CURRENCY_DEFAULT_TEXT', t('We accept payments in these currencies.'));
+define ('WSPAY_AMOUNT_TEXT',           'wspay_amount_text');
+define ('WSPAY_AMOUNT_DEFAULT_TEXT',   t('Enter the amount you wish to pay.'));
+define ('WSPAY_SUBMIT_TEXT',           'wspay_submit_text');
+define ('WSPAY_SUBMIT_DEFAULT_TEXT',   t('Proceed to paypal.com for payment'));
+define ('WSPAY_MEMO_TEXT',             'wspay_memo_text');
+define ('WSPAY_MEMO_DEFAULT_TEXT',     t('Calling Card'));
+define ('WSPAY_PAGE_TITLE',            'wspay_page_title');
+define ('WSPAY_DEFAULT_PAGE_TITLE',    t('Donate'));
+define ('WSPAY_DEFAULT_EMAIL',         t('webmaster@localhost'));
+
+/**
+ * Implementation of hook_perm().
+ */
+function wspay_perm() {
+  return array('administer payment');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function wspay_menu() {
+  $items = array();
+
+    $access = array('administer site configuration');
+
+    $items['ipn/wspay'] = array(
+      'page callback' => 'wspay_ipn',
+      'type'     => MENU_CALLBACK,
+      'access callback' => TRUE,
+    );
+    $items['weos/wspay/thanks'] = array(
+      'title' => variable_get(WSPAY_THANKS_TITLE, WSPAY_THANKS_DEFAULT_TITLE),
+      'page callback' => 'wspay_thanks',
+      'type'     => MENU_CALLBACK,
+      'access callback' => TRUE,
+    );
+    $items['admin/settings/wspay'] = array(
+      'title' => 'Paypal Payment',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wspay_settings'),
+      'description' => 'Administer payment',
+      'access arguments' => $access,
+    );
+    $items['admin/build/wspay'] = array(
+      'title' => 'Paypal Payment',
+      'access arguments' => $access,
+      'page callback' => 'wspay_admin',
+      'description' => 'Manages Payment to your site via Paypal',
+    );
+    $items['admin/build/wspay/list'] = array(
+      'title' => 'List',
+      'access arguments' => $access,
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    );
+    $items['user/%user/pay'] = array(
+      'title' => variable_get(WSPAY_PAGE_TITLE, WSPAY_DEFAULT_PAGE_TITLE),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wspay_form_build'),
+      'type' => MENU_CALLBACK,
+      'access arguments' => array('access member'),
+      'access callback' => TRUE,
+    );
+    $items['hiddenwspays'] = array(
+      'title' => 'Donations',
+      'page callback' => 'wspay_public_page',
+      'type' => MENU_CALLBACK,
+      'access callback' => TRUE,
+    );
+  return $items;
+}
+
+/**
+ * Implementation of hook_settings().
+ */
+function wspay_settings() {
+  $form[general] = array(
+    '#type' => 'fieldset',
+    '#title' => t('General Settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form[general][WSPAY_EMAIL] = array(
+    '#type' => 'textfield',
+    '#title' => t('Donations email address'),
+    '#default_value' => variable_get(WSPAY_EMAIL, WSPAY_DEFAULT_EMAIL),
+    '#description' => t('Only payment to this email address are considered by this module.'),
+  );
+
+  $form[general][WSPAY_STATE] = array(
+    '#type'           => 'select',
+    '#title'          => t('Default paypal state'),
+    '#default_value'  => variable_get(WSPAY_STATE, WSPAY_PUBLIC),
+    '#options'        => array(
+      WSPAY_PUBLIC  => t('Public'),
+      WSPAY_HIDDEN  => t('Hidden')
+      ),
+    '#description' => t('Select whether payment will be public or private for this site.'),
+    );
+
+  $form[general][WSPAY_MEMO_TEXT] = array(
+    '#type' => 'textfield',
+    '#title' => t('Text for the PayPal memo field'),
+    '#default_value' => variable_get(WSPAY_MEMO_TEXT, WSPAY_MEMO_DEFAULT_TEXT),
+    '#description' => t('This text will be sent to PayPal in the memo field.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form[donate_page] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Payment Page'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form[donate_page][WSPAY_PAGE_TITLE] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title for the payment page'),
+    '#default_value' => variable_get(WSPAY_PAGE_TITLE, WSPAY_DEFAULT_PAGE_TITLE),
+    '#description' => t('This text will be used as the Title for the donate page.'),
+  );
+
+  $form[donate_page][WSPAY_DONATE_MESSAGE] = array(
+    '#type' => 'textarea',
+    '#title' => t('Introductory text for the donate page'),
+    '#default_value' => variable_get(WSPAY_DONATE_MESSAGE, WSPAY_DONATE_MESSAGE_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed to the user after they come back from Paypal.'),
+  );
+
+  $form[donate_page][WSPAY_CURRENCY_TEXT] = array(
+    '#type' => 'textfield',
+    '#title' => t('Description text for the currency field'),
+    '#default_value' => variable_get(WSPAY_CURRENCY_TEXT, WSPAY_CURRENCY_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed as the description for the currency field on the donate page.'),
+  );
+
+  $form[donate_page][WSPAY_AMOUNT_TEXT] = array(
+    '#type' => 'textfield',
+    '#title' => t('Description text for the amount field'),
+    '#default_value' => variable_get(WSPAY_AMOUNT_TEXT, WSPAY_AMOUNT_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed as the description for the amount field on the donate page.'),
+  );
+
+  $form[donate_page][WSPAY_SUBMIT_TEXT] = array(
+    '#type' => 'textfield',
+    '#title' => t('Text for the Submit button'),
+    '#default_value' => variable_get(WSPAY_SUBMIT_TEXT, WSPAY_SUBMIT_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed on the Submit button of the donate page.'),
+  );
+
+  $form[misc] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Miscellaneous'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form[misc][WSPAY_DONORS_TEXT] = array(
+    '#type' => 'textarea',
+    '#title' => t('Text for the donors list page'),
+    '#default_value' => variable_get(WSPAY_DONORS_TEXT, WSPAY_DONORS_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed at the top of the donors list page.'),
+  );
+
+  $form[misc][WSPAY_THANKS_TITLE] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title for the payment thank you page'),
+    '#default_value' => variable_get(WSPAY_THANKS_TITLE, WSPAY_THANKS_DEFAULT_TITLE),
+    '#description' => t('This text will be the Title of the page the user sees after they come back from Paypal.'),
+  );
+
+  $form[misc][WSPAY_THANKS_TEXT] = array(
+    '#type' => 'textarea',
+    '#title' => t('Text for the payment thank you page'),
+    '#default_value' => variable_get(WSPAY_THANKS_TEXT, WSPAY_THANKS_DEFAULT_TEXT),
+    '#description' => t('This text will be displayed to the user after they come back from Paypal.'),
+  );
+
+  return system_settings_form($form);
+}
+
+
+function wspay_resolve_uid($mail) {
+  return (int)db_result(db_query("SELECT uid FROM {users} WHERE mail = '%s'", $mail));
+}
+
+function wspay_admin() {
+  $rows = array();
+  $header = array(
+    array('data' => t('Date'),       'field' => 'timestamp', 'sort' => 'desc'),
+    array('data' => t('Name'),       'field' => 'name'),
+    array('data' => t('Amount'),     'field' => 'amount'),
+    array('data' => t('Status'),     'field' => 'status'),
+    array('data' => t('Operations'), 'colspan' => '2')
+  );
+
+  $sql = 'SELECT d.* FROM {wspay} d'. tablesort_sql($header);
+  $result = pager_query($sql, WSPAY_PAGER, 0, NULL);
+  while ($wspay = db_fetch_object($result)) {
+    $rows[] = array(format_date($wspay->timestamp, 'small'),
+        ($wspay->uid ? theme('username', $wspay) : check_plain($wspay->name)),
+        simple_paypal_format_amount($wspay->amount, $wspay->currency),
+        ($wspay->status == WSPAY_PUBLIC ? t('public') : t('hidden')),
+        "<a href=\"mailto:$wspay->mail\">". t('mail') ."</a>",
+        );
+  }
+
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, WSPAY_PAGER, 0);
+  print theme('page', $output);
+}
+
+function wspay_public_page() {
+  $rows = array();
+  $header = array(
+    array('data' => t('Name'),   'field' => 'name'),
+    array('data' => t('Amount'), 'field' => 'amount'),
+    array('data' => t('Date'),   'field' => 'timestamp', 'sort' => 'desc'),
+    );
+
+  $sql = 'SELECT d.* FROM {wspay} d WHERE d.status = %d'. tablesort_sql($header);
+  $result = pager_query($sql, WSPAY_PAGER, 0, NULL, WSPAY_PUBLIC);
+
+  while ($wspay = db_fetch_object($result)) {
+    if ($wspay->uid) {
+      $user = user_load(array('uid' => $wspay->uid));
+      $name = theme('username', $user);
+    }
+    else {
+      $name = $wspay->name;
+    }
+
+    $rows[] = array(
+      $name,
+      simple_paypal_format_amount($wspay->amount, $wspay->currency),
+      t('%time ago', array('%time' => format_interval(time() - $wspay->timestamp, 1)))); 
+  }
+
+  $output = variable_get(WSPAY_DONORS_TEXT, WSPAY_DONORS_DEFAULT_TEXT);
+  $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, WSPAY_PAGER, 0);
+  print theme('page', $output);
+}
+
+function wspay_thanks() {
+  print theme('page', variable_get(WSPAY_THANKS_TEXT, WSPAY_THANKS_DEFAULT_TEXT));
+}
+
+function wspay_ipn() {
+  watchdog('wspay', 'Donation from @name (@mail) amount of @amount @currency.', array(
+    '@name'     => $name,
+    '@mail'     => $payer_email,
+    '@amount'   => $amount,
+    '@currency' => $currency,
+    ));
+    //print_r($_POST);
+    //die;
+  // Verify that the request came from Paypal, and not from some intrusion
+  if (!simple_paypal_ipn_verify($_POST)) {
+    // curl verification failed
+    return;
+  }
+
+  if ($_POST['business'] != variable_get(WSPAY_EMAIL, WSPAY_DEFAULT_EMAIL)) {
+    // Payment is not for the email address configured
+    return;
+  }
+
+  // Format the fields
+  $name = check_plain($_POST['first_name'] .' '. $_POST['last_name'] . ($_POST['payer_business_name'] ? ' ('. $_POST['payer_business_name'] .')' : ''));
+//  $amount      = check_plain((float)$_POST['mc_gross'] - (float)$_POST['mc_fee']);
+  $txn_id      = check_plain($_POST['txn_id']);
+  $amount      = check_plain((float)$_POST['mc_gross']);
+  $fee      = check_plain((float)$_POST['mc_fee']);
+  $timestamp   = check_plain(strtotime($_POST['payment_date']));
+  $payer_email = check_plain($_POST['payer_email']);
+  $currency    = check_plain($_POST['mc_currency']);
+  $uid         = check_plain($_POST['custom']);
+  $uid         = $uid ? $uid : wspay_resolve_uid($mail);
+  // Record the wspay in the database
+  db_query("INSERT INTO {wspay} (timestamp, uid, name, mail, amount, currency, status,donor_comment) VALUES
+    (%d, %d, '%s', '%s', '%s', '%s', %d)", 
+    $timestamp,
+    $uid,
+    $name,
+    $payer_email,
+    $amount,
+    $currency,
+    variable_get(WSPAY_STATE, WSPAY_PUBLIC),
+    $txn_id );
+
+  $ret = currency_api_convert($currency, 'THB', $amount);
+  if ($ret['status'] == FALSE) { 
+    drupal_set_message(t('currency exchange error: ') . $ret['message']);
+  }
+  else {
+    $result .= '<p>';
+    $result .=  t('@amount @from = @value @to', array(
+      '@amount' => $amount,
+      '@from' => currency_api_get_desc($from),
+      '@value' => $ret['value'],
+      '@to' => currency_api_get_desc($to)));
+   };
+    $result = db_query("SELECT vuid FROM {users} WHERE  uid = %d ", $uid);
+    $vuser = db_fetch_object($result);
+
+    db_query("INSERT into voippayment(accountid,ref,paid) Values(%d,'Paypal:%s (%d %s)',%d)", $vuser->vuid,$txn_id,$amount,$currency,$ret['value']);
+    
+  watchdog('wspay', 'Donation from @name (@mail) amount of @amount @currency.', array(
+    '@name'     => $name,
+    '@mail'     => $payer_email,
+    '@amount'   => $amount,
+    '@currency' => $currency,
+    ));
+}
+
+/**
+ * Output this function in a PHP node when you want a form which points to Paypal.
+ */
+function wspay_form() {
+  return drupal_get_form('wspay_form_build');
+}
+
+function wspay_form_build() {
+  global $user;
+
+  $form['#action'] = simple_paypal_get_url();
+  $form['pre'] = array(
+    '#value' => variable_get(WSPAY_DONATE_MESSAGE, WSPAY_DONATE_MESSAGE_DEFAULT_TEXT));
+  $form['business'] = array(
+    '#type' => 'hidden',
+    '#name' => 'business',
+    '#value' => variable_get(WSPAY_EMAIL, WSPAY_DEFAULT_EMAIL));
+  $form['cmd'] = array(
+    '#type' => 'hidden',
+    '#value' => '_xclick',
+    '#name' => 'cmd');
+  $form['item_name'] = array(
+    '#type' => 'hidden',
+    '#value' => variable_get(WSPAY_MEMO_TEXT, WSPAY_MEMO_DEFAULT_TEXT),
+    '#name' => 'item_name');
+  $form['no_shipping'] = array(
+    '#type' => 'hidden',
+    '#value' => 1,
+    '#name' => 'no_shipping');
+  $form['return'] = array(
+    '#type' => 'hidden',
+    '#value' => url('weos/wspay/thanks', array('absolute' => TRUE)),
+    '#name' => 'return');
+  $form['currency_code'] = array(
+    '#type' => 'select',
+    '#title' => t('Currency'),
+    '#options' => simple_paypal_get_currencies(),
+    '#name' => 'currency_code',
+    '#description' => variable_get(WSPAY_CURRENCY_TEXT, WSPAY_CURRENCY_DEFAULT_TEXT),
+  );
+  $form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Amount'),
+    '#description' => variable_get(WSPAY_AMOUNT_TEXT, WSPAY_AMOUNT_DEFAULT_TEXT),
+    '#size' => 40,
+    '#required' => TRUE,
+    '#maxlength' => 255,
+    '#name' => 'amount',
+  );
+  $form['notify_url'] = array(
+    '#type' => 'hidden',
+    '#value' => url('ipn/wspay', array('absolute' => TRUE)),
+    '#name' => 'notify_url',
+  );
+  $form['custom'] = array(
+    '#type' => 'hidden',
+    '#value' => $user->uid,
+    '#name' => 'custom',
+  );
+  $form['submit'] = array(
+    '#type' => 'submit', 
+    '#value' => variable_get(WSPAY_SUBMIT_TEXT, WSPAY_SUBMIT_DEFAULT_TEXT),
+    '#name' => 'submit',
+  );
+
+  return $form;
+}
+

@@ -1,0 +1,6 @@
+name = Hosted IPPBX
+description = Hosted IPPBX
+package = TuxZA
+version = "5.0"
+project = "TuxZA"
+core = 6.x

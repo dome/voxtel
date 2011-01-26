@@ -1,0 +1,8 @@
+name = Weos User Module
+description = A User CDR module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

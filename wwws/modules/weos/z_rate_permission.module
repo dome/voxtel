@@ -1,0 +1,7 @@
+<?php
+
+function z_rate_permission_perm() {
+        return array('Rate','Import rate','Add rate','Group rate','Provider rate');
+}
+
+?>

@@ -1,0 +1,507 @@
+<?php
+function tmember_inc_balance($user,$amt){
+	global $memcache;
+	if ($amt <= 0){
+		return;
+	};
+	if ($user){
+		$bal = $memcache->get($user.':balance');
+		$bal = $bal + $amt;
+		$get_result = $memcache->set($user.':balance',$bal);
+	};
+}
+function tmember_dec_balance($user,$amt){
+	global $memcache;
+	if ($amt <= 0){
+		return;
+	};
+	if ($user){
+		$bal = $memcache->get($user.':balance');
+		$bal = $bal - $amt;
+		$get_result = $memcache->set($user.':balance',$bal);
+	};
+}
+function vsystem_context_links_alter(&$links) {
+	$item1 = menu_get_item();
+	$path=$item1['path'];
+	//print_r($item1); die;
+	//  if (context_get('context', 'spaces-feature-members') && module_exists('ucreate') && user_access('create users')) {
+	switch ($path) {
+		case 'weos/service':
+			$item = menu_get_item('weos/service/add');
+			if ($item['access']) {
+				$links['atrium_add_service'] = array(
+        			'title' => $item['title'],
+        			'href' => $item['href'],
+				);
+			}
+	}
+	//  }
+}
+function vsystem_init() {
+	global $user;
+	$jsstr = <<< XML
+<SCRIPT language="JavaScript1.2">
+function popuponclick()
+{
+my_window = window.open("https://192.168.11.3/ajam/?exten=$user->extention&username=manager&secret=pass","myW","height=600,width=650,location=no,scrollbars=yes,resizable=yes,statusbar=no,menubar=no,toolbar=no,dependent=yes")
+my_window.focus();
+my_window.moveTo(100,100);
+}
+
+function closepopup()
+{
+	popuponclick();
+	if(false == my_window.closed)
+	{
+	    //my_window.close();
+	    my_window.focus();
+	    my_window.moveTo(100,100);
+	}
+	else
+	{
+	//alert('Window already closed!');
+	    popuponclick();
+	}
+}
+	//if(false == my_window.closed)
+	//{
+	//    popuponclick();
+	//};    
+//popuponclick();	
+</SCRIPT>
+	
+XML;
+
+	$jsstr_close = <<< XML1
+<script type="text/javascript" language="javascript">
+//myW.close();
+</script>
+XML1;
+	$jsstr_disable = <<< XML1
+<script type="text/javascript" language="javascript">
+	document.getElementById('statusbar').innerHTML = "<i>Retrieving channel status...</i>";
+</script>
+XML1;
+	if (strlen($user->extention) > 0){
+		echo $jsstr;
+	};
+	//		echo $jsstr_disable;
+	//drupal_add_css(drupal_get_path('module', 'vsystem') .'/astman.css');
+	//drupal_add_js(drupal_get_path('module', 'vsystem'). '/prototype.js');
+	//drupal_add_js(drupal_get_path('module', 'vsystem'). '/astman.js');
+	//drupal_add_js(drupal_get_path('module', 'vsystem'). '/asttux.js');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+
+function vsystem_menu() {
+
+	$items['weos'] = array(
+    'title' => 'System',
+    'menu_name' => 'features',
+    'weight' => 15, 
+    'page callback' => 'vsystem_overview',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access rate'),
+    'type' => MENU_NORMAL_ITEM,
+	);
+	$items['weos/pbx'] = array(
+    'title' => 'PBX interface',
+    'menu_name' => 'features',
+    'weight' => 15, 
+    'page callback' => 'vsystem_pbx',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access rate'),
+    'type' => MENU_LOCAL_TASK,
+	);
+	$items['weos/case'] = array(
+    'title' => 'Case Tracker',
+    'menu_name' => 'features',
+    'weight' => 15, 
+    'page callback' => 'vsystem_case',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access rate'),
+    'type' => MENU_LOCAL_TASK,
+	);
+	$items['weos/config'] = array(
+    'title' => 'Config',
+    'menu_name' => 'features',
+    'weight' => -3, 
+    'page callback' => 'vsystem_overview',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access rate'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+	);
+	$items['weos/service'] = array(
+    'title' => 'Service',
+    'menu_name' => 'features',
+    'weight' => 99, 
+    'page callback' => 'vsystem_service',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access rate'),
+    'type' => MENU_LOCAL_TASK,
+	);
+	$items['weos/service/add'] = array(
+                'description' => 'Add Service.',
+				'menu_name' => 'features',
+                'title' => 'Add Service',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vsystem_service_form'),
+                'access arguments' => array('access rate'),
+		'type' => MENU_CALLBACK,
+	);
+	//vsystem_confirm_delete_service
+	$items['weos/service/delete'] = array(
+                'title' => 'Edit System Config',
+				'menu_name' => 'features',
+				'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vsystem_confirm_delete_service'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+	$items['weos/system/edit'] = array(
+                'title' => 'Edit System Config',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vsystem_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+	$items['weos/system/testroute'] = array(
+                'description' => 'Test Route.',
+		'menu_name' => 'features',
+                'title' => 'Test Route',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vsystem_testroute'),
+                'access arguments' => array('access rate'),
+		'type' => MENU_LOCAL_TASK,
+	);
+	$items['weos/system/reportroute'] = array(
+                'description' => 'Report Route.',
+                'page callback' => 'vsystem_reportroute',
+                'weight' => 5,
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+	$items['userdetail'] = array(
+                'description' => 'Report Route.',
+                'page callback' => 'vstaff_check_user',
+                'weight' => 5,
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+	return $items;
+}
+function vsystem_confirm_delete_service(&$form_state, $id=null,$name=null) {
+	if (!$id) {
+		return drupal_goto('weos/service');
+	}
+	if (!$name) {
+		return drupal_goto('weos/service');
+	}
+	$form['id'] = array('#type' => 'value', '#value' => $id);
+	$form['name'] = array('#type' => 'value', '#value' => $name);
+
+	return confirm_form($form,
+	t('Are you sure you want to delete the service %name?', array('%name' => $name)),
+    'weos/service',
+	t('This action cannot be undone.'),
+	t('Delete'), t('Cancel'));
+}
+
+function vsystem_confirm_delete_service_submit($form, &$form_state) {
+	if ($form['confirm']) {
+		$id = $form_state['values']['id'];
+		db_query("delete from ws_service where id=%s",$id);
+		db_query("delete from ws_service_member where sid=%s",$id);
+		drupal_set_message($form_state['values']['name']." has been deleted.");
+	}
+	if (!isset($_REQUEST['destination'])) {
+		$form_state['redirect'] = 'weos/service';
+	}
+}
+
+
+function vsystem_service(){
+	$header = array(
+	array('data' => t('Service'), 'field' => 'description'),
+	array('data' => t('Price'), 'field' => 'price'),
+	array('data' => t('Operations'))
+	);
+	$sql = " SELECT * from ws_service ";
+	$result = pager_query($sql, 50,0);
+
+	while ($data = db_fetch_object($result)) {
+		$rows[] = array(
+		// Cells
+		$data->description,
+		$data->price.' / '.$data->day.' days',
+		l('Edit','weos/service/edit/'.$data->id).' | '.l('Del','weos/service/delete/'.$data->id.'/'.$data->description),
+		);
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+
+	return $output;
+
+
+};
+
+function vsystem_pbx() {
+	global $user;
+	flot_add_js();
+	$o=flot_read_graph('rt.g');
+	return $o;
+}
+
+function vsystem_case() {
+	return drupal_goto('b/casetracker');
+}
+
+function vsystem_overview(){
+	//    $result = db_query("update dr_users set uid=uid;");
+	//    $data = db_fetch_object($result);
+	//    print_r($data);
+	//    die;
+	$header = array(
+	array('data' => t('Minimum Margin'), 'field' => 'min_margin'),
+	array('data' => t('Time Zone'), 'field' => 'tz'),
+	//        array('data' => t('Second Per Min'), 'field' => 'sec_p_min'),
+	//        array('data' => t('Service Charge/Time'), 'field' => 'charge'),
+	array('data' => t('Operations'))
+	);
+	$zones = _ws_zonelist();
+	$sql = " SELECT * from ws_system ";
+	$result = pager_query($sql, 50,0);
+
+	while ($data = db_fetch_object($result)) {
+		$rows[] = array(
+		// Cells
+		$data->min_margin,
+		$zones[$data->tz],
+		//                $data->sec_p_min,
+		//                $data->charge,
+		l('Edit','weos/system/edit'),
+		);
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+
+	return $output;
+
+
+};
+function vsystem_testroute() {
+	//     global $form;
+	$form['callerid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Caller ID"),
+	//    '#default_value' => $form['callerid'],
+    '#description' => t("Test Call From "),
+    '#maxlength' => 20,
+    '#size' => 20,
+        '#required' => true,
+	);
+
+	$form['calling'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Calling To"),
+	//    '#default_value' => '',
+    '#maxlength' => 20,
+    '#size' => 20,
+        '#required' => true,
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vsystem_reportroute($caller, $calling) {
+	global $user;
+	//loc	err	timeout	price	cost	provider_id	provider
+	$header = array(
+	array('data' => t('Dial Tech'), 'field' => 'loc'),
+	array('data' => t('Rate'), 'field' => 'rate'),
+	array('data' => t('Balance'), 'field' => 'balance'),
+	);
+	;
+	$sql = "select loc,timeout,provider_id,provider,err,balance,saymin,umaxtime  from c_get_route('$caller','$calling') as
+         (loc text,err text,timeout integer,price numeric,cost numeric,provider_id integer,provider text,balance numeric(12,4),saymin integer,umaxtime integer )  ";
+	$sql = "select *  from lcr('$caller','$calling','external')";
+	$sql_count = "select 3 Limit 3";
+
+	//echo $sql;
+	$result = pager_query($sql, 3,0,$sql_count);
+
+	while ($data = db_fetch_object($result)) {
+		$rows[] = array(
+		$data->gw_prefix.$data->prefix.$data->gw_suffix,
+		$data->rate,
+		$data->balance,
+		);
+	}
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 3, 0);
+	return $output;
+}
+
+function vsystem_testroute_submit($form, &$form_state) {
+	global $user;
+	drupal_goto('weos/system/reportroute/'.$form_state['values'][callerid].'/'.$form_state['values'][calling]);
+}
+function vsystem_service_form($form_state = array(),$id = NULL) {
+	if ($id) {
+		$sqlstr = "SELECT * FROM ws_service  WHERE id = $id";
+		$result = db_query($sqlstr);
+		$data = db_fetch_object($result);
+		$form['id'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Service ID"),
+    '#default_value' => $data->id,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+		);
+	}
+	$form['description'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Service"),
+    '#default_value' => $data->description,
+    '#maxlength' => 255,
+    '#required' => true,
+	);
+
+	$form['price'] = array(
+    '#type' => 'textfield',
+
+    '#title' => t("Price"),
+    '#default_value' => $data->price,
+    '#required' => true,
+	);
+	$form['day'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Day"),
+    '#default_value' => $data->day,
+    '#required' => true,
+	);
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vsystem_service_form_submit($form, &$form_state) {
+	if ($form['id'] > 0)  {
+		$result = db_query("update ws_service set description='%s',price = %f,day=%d where id = %d;",
+		$form_state['values']['description'],$form_state['values']['price'],$form_state['values']['day'],$form_state['values']['id']);
+		$card_lot = db_fetch_object($result);
+	}else{
+		$result = db_query("insert into ws_service(description,price,day) Values('%s',%f,%d)",
+		$form_state['values']['description'],$form_state['values']['price'],$form_state['values']['day']);
+		$card_lot = db_fetch_object($result);
+
+	};
+	return drupal_goto('weos/service');
+}
+
+function vsystem_form() {
+	$result = db_query("SELECT * FROM ws_system Limit 1 Offset 0");
+	$data = db_fetch_object($result);
+	if (!$data) {
+		drupal_set_message("Error.! System Config Not found.");
+		return drupal_goto('weos');
+	}
+
+
+	$form['min_margin'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Minimum Margin (%)"),
+    '#default_value' => $data->min_margin,
+    '#description' => t("System Minimum Margin for LCR."),
+    '#maxlength' => 10,
+    '#size' => 10,
+        '#required' => true,
+	);
+	$zones = _ws_zonelist();
+	$form['tz'] = array(
+        '#title' => t("Time Zone"),
+        '#type' => 'select',
+        '#options' => $zones,
+        '#default_value' => $data->tz,
+	//  '#columns' => 16,
+	//  '#theme' => 'columns_checkboxes',
+	);
+
+	/*
+	 $form['sec_p_min'] = array(
+	 '#type' => 'textfield',
+	 '#title' => t("Second Per Minute"),
+	 '#default_value' => $data->sec_p_min,
+	 '#maxlength' => 10,
+	 '#size' => 10,
+	 '#required' => true,
+	 );
+	 $form['charge'] = array(
+	 '#type' => 'textfield',
+	 '#title' => t("Service Charge"),
+	 '#default_value' => $data->charge,
+	 '#maxlength' => 10,
+	 '#size' => 10,
+	 '#required' => true,
+	 );
+	 */
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vsystem_form_submit($form, &$form_state) {
+	global $user;
+	db_query("UPDATE ws_system SET min_margin = %d, tz = %d ", $form_state['values']['min_margin'],$form_state['values']['tz']);
+	drupal_set_message("System Config has been saved.");
+	drupal_goto('weos');
+}
+
+/* Return True if user is authenticated OR coming from inside the intranet */
+function admin_authorized() {
+	global $user;
+	return($user->uid == 0 || pih_internal());
+}
+
+function pih_internal() {
+	if (substr(ip_address(), 0, 2) != "10") return true;
+	return false;
+}

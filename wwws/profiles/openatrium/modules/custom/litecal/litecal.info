@@ -1,0 +1,16 @@
+name = "Litecal"
+description = "A lite clean calendar UI."
+core = "6.x"
+
+; Information added by fserver
+core = "6.x"
+datestamp = "1263332074"
+project = "litecal"
+project status url = "http://code.developmentseed.org/fserver"
+version = "6.x-1.0-alpha1"
+; Information added by fserver
+core = "6.x"
+datestamp = "1266436984"
+project = "litecal"
+project status url = "http://code.developmentseed.org/fserver"
+version = "6.x-1.0-alpha2"

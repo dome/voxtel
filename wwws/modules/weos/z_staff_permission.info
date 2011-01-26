@@ -1,0 +1,8 @@
+name = TuxZa Permission Staff Menu
+description = A TuxZa Permission  Staff Menu
+package = "Weos Premission"
+version = "5.0"
+project = "WeOS Permission"
+
+
+core = 6.x

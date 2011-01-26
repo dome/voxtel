@@ -1,0 +1,187 @@
+<?php
+
+function thost_inc_balance($user,$amt){
+	global $memcache;
+	if ($amt <= 0){
+		return;
+	};
+	if ($user){
+		$bal = $memcache->get($user.':balance');
+		$bal = $bal + $amt;
+		$get_result = $memcache->set($user.':balance',$bal);
+	};
+}
+function thost_dec_balance($user,$amt){
+	global $memcache;
+	if ($amt <= 0){
+		return;
+	};
+	if ($user){
+		$bal = $memcache->get($user.':balance');
+		$bal = $bal - $amt;
+		$get_result = $memcache->set($user.':balance',$bal);
+	};
+}
+
+function thost_perm() {
+	return array('access hosted');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function thost_menu() {
+	global $user;
+	$items['macct'] = array(
+    	    'description' => 'Sub Account',
+    	    'title' => 'Sub Account',
+    	    'menu_name' => 'features',
+    	    'page callback' => 'thost_overview',
+    	    'weight' => -8,
+    	    'access arguments' => array('access hosted'),
+    	    'type' => MENU_NORMAL_ITEM,
+	);
+
+	$items['macct/list'] = array(
+      'description' => 'Sub Account.', 'title' => 'Sub Account',
+      'page callback' => 'thost_overview',
+      'weight' => -9,
+      'access arguments' => array('access hosted'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+	);
+
+	$items['reseller/add'] = array(
+        'description' => 'Create Account.','title' => 'Create',
+        'menu_name' => 'features',
+      'weight' => -100,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('thost_add_form'),
+      'access arguments' => array('access hosted'),
+      'type' => MENU_LOCAL_TASK
+	);
+
+	return $items;
+}
+
+function thost_edit_form($id = NULL) {
+	global $user;
+	if (!$id) {
+		return drupal_goto('macct');
+	}
+
+	$sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and owner='$user->name'";
+	$result = db_query($sqlstr);
+	$card_lot = db_fetch_object($result);
+	if (!$card_lot) {
+		drupal_set_message("User ".$id." Not Found.",'error');
+		//return $output;
+		return drupal_goto('user');
+	};
+
+	$form['accountid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Account ID"),
+    '#default_value' => $card_lot->accountid,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 255,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$form['secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Password"),
+    '#default_value' => $card_lot->secret,
+    '#required' => true,
+	);
+	$form['balance'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Balance"),
+    '#default_value' => $card_lot->balance,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$types = array();
+	$result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp where id = %d',$card_lot->grpid);
+	while ($object = db_fetch_object($result)) {
+		$names[$object->id] = $object->description;
+	}
+	$form['grpid'] = array(
+    '#type' => 'select',
+    '#title' => t("rate"),
+    '#options' => $names,
+    '#default_value' => $card_lot->grpid,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function thost_edit_form_submit($form, &$form_state) {
+	if ($form['accountid'] > 0)  {
+		//    $result = db_query("update voipusers set secret = '%s' where username = '%s';", $form['secret'],$form['username']);
+		$result = db_query("update dr_users set plainpass = '%s',pass=MD5('%s') where name = '%s';", $form['secret'],$form['secret'],$form['username']);
+		$card_lot = db_fetch_object($result);
+		$result = db_query("update voiptariffsel set grpid = '%d' where accountid = '%d';", $form['grpid'],$form['accountid']);
+		$card_lot = db_fetch_object($result);
+	};
+	return drupal_goto('member');
+}
+
+
+function thost_overview() {
+	global $user;
+	if ($user->uid==0){
+		return drupal_goto('user/login');
+	}
+
+	$header = array(
+	array('data' => t('Username'), 'field' => 'name'),
+	array('data' => t('Password'), 'field' => 'plainpass'),
+	array('data' => t('')),
+	);
+
+	$tablesort = tablesort_sql($header);
+	$sql = " select * from dr_users ";
+	$sql_count = " select * from dr_users ";
+	$sql .= " WHERE m_acct = '$user->name' ";
+	$sql_count .= " WHERE m_acct = '$user->name' ";
+	$result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+	while ($data = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		$data->name,
+		$data->plainpass,
+		'',
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+
+	return $output;
+}
+

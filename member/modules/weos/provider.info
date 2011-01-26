@@ -1,0 +1,7 @@
+name = Weos Provider Module
+description = A weos Provider module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+core = 6.x

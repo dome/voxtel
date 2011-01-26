@@ -1,0 +1,8 @@
+<?php
+
+function z_provider_permission_perm() {
+        return array('Provider Rate','Gateway provider','Import rate provider','Add rate provider',
+        'Add Provider provider','Export rate provider');
+}
+
+?>

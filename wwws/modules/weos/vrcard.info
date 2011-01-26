@@ -1,0 +1,8 @@
+name = Weos Card Module For Reseller
+description = A weos card module For Reseller
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

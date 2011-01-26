@@ -1,0 +1,8 @@
+name = Weos Member Module
+description = A weos Member Module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

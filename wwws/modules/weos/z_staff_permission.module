@@ -1,0 +1,7 @@
+<?php
+
+function z_staff_permission_perm() {
+        return array('Register','Member','Adjust Credit','Check Card','Check Serial','Check Usage','Topup','Transfer','Check Rate','Staff Transfer','Check Log','Lock Card/User');
+}
+
+?>

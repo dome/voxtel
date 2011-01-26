@@ -1,0 +1,881 @@
+<?php
+
+function rate_perm() {
+    return array('access rate','admin rate');
+}
+
+function rate_menu() {
+
+    $items['rate'] = array(
+                'description' => 'View rate.', 'title' => 'Rate',
+                'page callback' => 'rate_overview',
+                'menu_name' => 'features',
+                'weight' => -1,
+                'access callback' => 'user_access',
+                'access arguments' => array('access rate'),
+                'type' => MENU_NORMAL_ITEM
+    );
+
+    $items['rate/list'] = array(
+                'description' => 'View rate.', 'title' => 'Rate',
+                'page callback' => 'rate_overview',
+                'menu_name' => 'features',
+                'weight' => -1,
+    		'access callback' => 'user_access',
+                'access arguments' => array('access rate'),
+                'type' => MENU_DEFAULT_LOCAL_TASK
+    );
+
+
+    $items['rate/add'] = array(
+                'description' => 'Add new rate.', 'title' => 'Add',
+                'page callback' => 'drupal_get_form',
+                'weight' => 0,
+                'menu_name' => 'features',
+                'page arguments' => array('rate_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK, 'weight' => 1);
+
+    $items['rate/edit'] = array(
+                'title' => 'Edit Rate',
+                'weight' => 0,
+                'menu_name' => 'features',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+    $items['rate/group'] = array(
+                'description' => 'Rate Group.', 'title' => 'Group',
+                'page callback' => 'rate_group_overview',
+                'menu_name' => 'features',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK,
+                'weight' => 1);
+    $items['rate/group/list'] = array(
+                'description' => 'Rate Group.', 'title' => 'Group',
+                'page callback' => 'rate_group_overview',
+                'menu_name' => 'features',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_DEFAULT_LOCAL_TASK,
+                'weight' => 1);
+
+    $items['rate/group/add'] = array(
+                'description' => 'Add new rate group.', 'title' => 'Add Group',
+                'menu_name' => 'features',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_group_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK,
+                 'weight' => 2);
+                                  
+    $items['rate/group/edit'] = array(
+                'title' => 'Edit Group',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_group_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+    $items['rate/group/delete'] = array(
+                'title' => 'Delete Group',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_group_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+    $items['rate/import'] = array(
+                'title' => 'Import',
+                'menu_name' => 'features',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_import_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK
+                );
+
+    $items['rate/delete'] = array(
+                'page callback' => 'drupal_get_form', 'title' => 'Remove Rate',
+                'menu_name' => 'features',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('rate_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+    $items['rate/provider'] = array(
+                'description' => 'Provider For Rate Group.', 'title' => 'Provider',
+                'menu_name' => 'features',
+                'page callback' => 'rate_provider_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK,
+                 'weight' => 3);
+
+    $items['rate/provider/list'] = array(
+                'description' => 'Provider For Rate Group.', 'title' => 'Provider',
+                'menu_name' => 'features',
+                'page callback' => 'rate_provider_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_DEFAULT_LOCAL_TASK,
+                 'weight' => 3);
+
+    $items['rate/provider/del'] = array(
+                'description' => 'Provider For Rate Group.', 'title' => 'Provider',
+                'page callback' => 'rate_provider_del',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+
+
+    return $items;
+}
+function rate_provider_del($id=NULL) {
+    db_query('delete from voipgroup where id='.$id);
+    return drupal_goto('rate/provider');
+};
+
+function rate_provider_overview() {
+
+    $output = drupal_get_form('rate_form_overview');
+    $output .= drupal_get_form('rate_provider_form_overview');
+
+    $header = array(
+        array('data' => t('Provider'), 'field' => 'vname'),
+        array('data' => t('Operations'))
+    );
+
+    $tablesort = tablesort_sql($header);
+    $type = $_SESSION['rate_overview_filter'];
+    $search_str = $_SESSION['rate_search_filter'];
+    $sql = " SELECT * from voipgroup   ";
+    $sql_count = "select count(id) from voipgroup";
+    if ($type != '0') {
+        $sql .= " WHERE gid = $type ";
+        $sql_count .= " WHERE gid = $type ";
+    }else{
+        $sql .= " WHERE 0=0 ";
+        $sql_count .= " WHERE 0=0 ";
+
+    }
+    if ($search_str != '') {
+        $sql .= " AND upper(vname) LIKE upper('$search_str%') ";
+        $sql_count .= " AND upper(vname) LIKE upper('$search_str%') ";
+    };
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($data = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $data->vname,
+            l('Delete','rate/provider/del/'.$data->id),
+        );
+    }
+
+    if (!$rows) {$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+
+function rate_provider_form_overview() {
+
+
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(provider),id FROM voip_providers ORDER BY provider');
+    while ($object = db_fetch_object($result)) {
+        $names[$object->id] = $object->provider;
+    }
+    $form['pid'] = array(
+        '#type' => 'select',
+        '#title' => t('Filter by Provider'),
+        '#options' => $names,
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Add Provider'));
+    //    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+function rate_provider_form_overview_submit($form, &$form_state) {
+    $object = db_fetch_object(db_query('select provider from voip_providers where id='.$form_state['values']['pid']));
+    //echo $form_state['values']['pid'].$object->provider;
+    //echo $_SESSION['rate_overview_filter'];
+    //die;
+    // check dupplicate
+    $ck_data = db_fetch_object(db_query('select id from voipgroup where type=2 and vid='.$form_state['values']['pid'].' and gid='.$_SESSION['rate_overview_filter']));
+    $sql_str = "insert into voipgroup(type,gid,vid,vname) values(2,".$_SESSION['rate_overview_filter'].",".$form_state['values']['pid'].",'".$object->provider."')";
+    // echo $sql_str;
+    //die;
+    if (!$ck_data) {
+        db_query($sql_str);
+
+    };
+}
+
+
+function rate_import_form($form_state,$id = NULL) {
+    $form = array('#attributes' => array('enctype' => 'multipart/form-data'));
+    if ($id) {
+        $result = db_query("SELECT * FROM voiptariff WHERE id = %d", $id);
+        $rate = db_fetch_object($result);
+        if (!$rate) {
+            return drupal_goto('rate');
+        }
+
+        $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+        );
+    }else{
+        $types = array();
+        $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+        while ($object = db_fetch_object($result)) {
+            $names[$object->id] = $object->description;
+        }
+        $form['grpid'] = array(
+                '#type' => 'select',
+                '#title' => t('Filter by Rate group'),
+                '#options' => $names,
+                '#default_value' => $_SESSION['rate_overview_filter']
+        );
+
+    }
+    // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['remove'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Remove before Add new Rate'),
+    '#size' => 20,
+    );
+
+    $form['update'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Update old table.'),
+    '#size' => 20,
+    );
+
+    $form['upload'] = array(
+        '#type' => 'file',
+        '#title' => t('CSV file'),
+    '#description' => t('CSV format: price,currencysym,initialincrement,regularincrement,graceperiod,description,prefix'),
+    );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+function rate_import_form_validate($form, &$form_state) {                                                                                             
+
+
+}      
+/**
+* Add/Edit bookmark form submit
+*/
+function rate_import_form_submit($form, &$form_state) {
+    //print_r($form);
+    $buffer = '';
+/* TODO Modify the validators array to suit your needs.
+   This array is used in the revised file_save_upload */
+    if ($file = file_save_upload('upload')) {
+        $file->list = variable_get('upload_list_default', 1);
+        $file->description = $file->filename;
+        $file->weight = 0;
+        $file->new = TRUE;
+        $form['#node']->files[$file->fid] = $file;
+        $form_state['values']['files'][$file->fid] = (array)$file;
+    }
+    $handle = fopen($file->filepath, 'r');
+    set_time_limit(0);
+
+    //the top line is the field names
+    $fields = fgetcsv($handle, 4096, ',');
+
+    //loop through one row at a time
+    //echo $form['move'];
+    //echo $form['grpid'];
+    //print_r($form);
+
+    $sqlstr = "";
+    if ($form_state['values']['remove']==1) {
+        $sqlstr .= "Delete from voiptariff where grpid=".$form_state['values']['grpid'].";";
+    };
+    while (($data = fgetcsv($handle, 4096, ',')) !== FALSE)
+    {
+        //print_r($fields);
+        //print_r($data);
+        //$fields[] = "grpid";
+        //$data[] = $form['grpid'];
+        //array_push($fields, "grpid");
+        //array_push($data,$form['grpid']);
+        //print_r($fields);
+        //print_r($data);
+        $data = array_combine($fields, $data);
+        //$data['grpid'] = $form['grpid'];
+        //$sqlstr .= db_build_insert("voiptariff",$data);
+        if($form['update']==1){
+            $data['grpid'] = $form['grpid'];
+            $sqlstr .= db_build_update("voiptariff",$data,"grpid",$form_state['values']['grpid']);
+        }else{
+            $data['grpid'] = $form_state['values']['grpid'];
+            $sqlstr .= db_build_insert("voiptariff",$data);
+        }
+        //print_r($data);
+    };
+    fclose($handle);
+    //print_r($data);
+    //echo $sqlstr;
+    //die;
+    $sqlstr = "BEGIN;  \n".$sqlstr."  \nCOMMIT;";
+    db_query($sqlstr);
+    drupal_set_message("Rate  '".$form_state['values'][prefix]."' has been Created.");
+    drupal_goto('rate');
+}
+function db_build_insert($table,$array)
+{
+
+    $str = "insert into $table ";
+    $strn = "(";
+    $strv = " VALUES (";
+    while(list($name,$value) = each($array)) {
+
+        if(is_bool($value)) {
+            $strn .= "$name,";
+            $strv .= ($value ? "true":"false") . ",";
+            continue;
+        };
+
+        if(is_string($value)) {
+            $strn .= "$name,";
+            $strv .= "'$value',";
+            continue;
+        }
+        if (!is_null($value) and ($value != "")) {
+            $strn .= "$name,";
+            $strv .= "$value,";
+            continue;
+        }
+    }
+    $strn[strlen($strn)-1] = ')';
+    $strv[strlen($strv)-1] = ')';
+    $str .= $strn . $strv;
+    return $str.";";
+
+}
+function rate_group_form_overview() {
+    if (empty($_SESSION['rate_group_search_filter'])) {
+        $_SESSION['rate_group_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Search',
+        '#size' => 20,
+        '#default_value' => $_SESSION['rate_group_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+    //    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+function rate_group_overview() {
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('rate_group_form_overview');
+
+    $header = array(
+        array('data' => t('Group'), 'field' => 'description'),
+        array('data' => t('Service Charge'), 'field' => 'service_charge'),
+        array('data' => t('Operations')),
+    );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['rate_group_search_filter'];
+    $sql = " select * from  voiptariffgrp ";
+    $sql_count = "select count(id) from  	voiptariffgrp";
+
+    if ($search_str != '') {
+        $sql .= " WHERE upper(voiptariffgrp.description) LIKE upper('$search_str%') ";
+        $sql_count .= " WHERE upper(voiptariffgrp.description) LIKE upper('$search_str%') ";
+    };
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->description,
+            $rate->service_charge,
+            l('Edit','rate/group/edit/'.$rate->id)." ".l('Delete','rate/group/delete/'.$rate->id),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+/**
+* Implementation of hook_cron().
+*
+* Remove expired log messages and flood control events.
+*/
+function rate_cron() {
+    //  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+    //  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+* Implementation of hook_user().
+*/
+//function rate_user($op, &$edit, &$user) {
+//    if ($op == 'delete') {
+//            db_query('UPDATE {watchdog} SET uid = 0 WHERE uid = %d', $user->uid);
+//        }
+//}
+
+function rate_group_select_form_overview() {
+    if (empty($_SESSION['rate_overview_filter'])) {
+        $_SESSION['rate_overview_filter'] = '0';
+    }
+
+    $types = array();
+
+    $names[0] = "All";
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $names[$object->id] = $object->description;
+    }
+    $form['filter'] = array(
+        '#type' => 'select',
+        '#title' => t('Filter by Rate group'),
+        '#options' => $names,
+        '#default_value' => $_SESSION['rate_overview_filter']
+    );
+    return $form;
+}
+
+function rate_form_overview() {
+
+
+    if (empty($_SESSION['rate_overview_filter'])) {
+        $_SESSION['rate_overview_filter'] = '0';
+    }
+    if (empty($_SESSION['rate_search_filter'])) {
+        $_SESSION['rate_search_filter'] = '';
+    }
+
+    $types = array();
+
+    $names[0] = "All";
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $names[$object->id] = $object->description;
+    }
+    $form['filter'] = array(
+        '#type' => 'select',
+        '#title' => t('Filter by Rate group'),
+        '#options' => $names,
+        '#default_value' => $_SESSION['rate_overview_filter']
+    );
+    $form['search'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Search',
+        '#size' => 20,
+        '#default_value' => $_SESSION['rate_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+    //    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+
+/**
+* Menu callback; displays a listing of log messages.
+*/
+function rate_overview() {
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('rate_form_overview');
+
+    $header = array(
+        array('data' => t('Destination'), 'field' => 'description'),
+        array('data' => t('Prefix'), 'field' => 'prefix'),
+        array('data' => t('Price'), 'field' => 'price'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+        array('data' => t('Group'), 'field' => 'group_dsc'),
+        array('data' => t('Operations'))
+    );
+
+    $tablesort = tablesort_sql($header);
+    $type = $_SESSION['rate_overview_filter'];
+    $search_str = $_SESSION['rate_search_filter'];
+        /*
+        SELECT voiptariff.id, voiptariffdst.prefix, voiptariffdst.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+        FROM voiptariff
+        LEFT JOIN voiptariffdst ON voiptariff.dstid = voiptariffdst.id
+        LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id;
+        */
+    $sql = "
+        SELECT voiptariff.id, voiptariff.prefix, voiptariff.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+        FROM voiptariff
+        LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id
+        ";
+    $sql_count = "select count(id) from voiptariff";
+    if ($type != '0') {
+        $sql .= " WHERE grpid = $type ";
+        $sql_count .= " WHERE grpid = $type ";
+    }else{
+        $sql .= " WHERE 0=0 ";
+        $sql_count .= " WHERE 0=0 ";
+
+    }
+    if ($search_str != '') {
+        $sql .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+        $sql_count .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+    };
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->description,
+            $rate->prefix,
+            $rate->price,
+            $rate->currencysym,
+            $rate->group_dsc,
+            l('Edit','rate/edit/'.$rate->id).' '.
+            l('Del','rate/delete/'.$rate->id),
+        );
+        // Attributes for tr
+        //'class' => "watchdog-". $classes[$watchdog->severity]
+        //);
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+function rate_form_overview_submit($form, &$form_state) {
+    $_SESSION['rate_overview_filter'] = $form_state['values']['filter'];
+    $_SESSION['rate_search_filter'] = $form_state['values']['search'];
+}
+
+function rate_group_form_overview_submit($form, &$form_state) {
+    $_SESSION['rate_group_search_filter'] = $form_state['values']['search'];
+}
+
+function rate_form($form_state = array(),$id = NULL) {
+    if ($id) {
+        $result = db_query("SELECT * FROM voiptariff WHERE id = %d", $id);
+        $rate = db_fetch_object($result);
+        if (!$rate) {
+            return drupal_goto('rate');
+        }
+
+        $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+        );
+    }else{
+        $types = array();
+        $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+        while ($object = db_fetch_object($result)) {
+            $names[$object->id] = $object->description;
+        }
+        $form['grpid'] = array(
+                '#type' => 'select',
+                '#title' => t('Filter by Rate group'),
+                '#options' => $names,
+                '#default_value' => $_SESSION['rate_overview_filter']
+        );
+
+    }
+    // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['description'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Destination"),
+        '#default_value' => $rate->description,
+        '#maxlength' => 255,
+        '#required' => true,
+    );
+
+    $form['prefix'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Prefix"),
+        '#default_value' => $rate->prefix,
+        '#required' => true,
+    );
+
+    $form['price'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Value"),
+        '#default_value' => $rate->price,
+        '#required' => true,
+    );
+
+
+    $form['currencysym'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Currency"),
+        '#default_value' => $rate->currencysym,
+        '#required' => true,
+    );
+
+    $form['initialincrement'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Initial Increment"),
+        '#default_value' => $rate->initialincrement,
+        '#required' => true,
+    );
+
+    $form['regularincrement'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Regular Increment"),
+        '#default_value' => $rate->regularincrement,
+        '#required' => true,
+    );
+
+    $form['graceperiod'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Grace Period"),
+        '#default_value' => $rate->graceperiod,
+        '#required' => true,
+    );
+
+    $atimelist = _ws_timebaselist();
+    $atimelist[0] = "All";
+    $form['atime'] = array(
+        '#title' => t("Allow Time base"),
+        '#type' => 'select',
+        '#options' => $atimelist,
+        '#default_value' => $rate->atime,
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+    );
+    $dtimelist = _ws_timebaselist();
+    $dtimelist[0] = "None";
+    $form['dtime'] = array(
+        '#title' => t("Deny Time base"),
+        '#type' => 'select',
+        '#options' => $dtimelist,
+        '#default_value' => $rate->dtime,
+        //  '#columns' => 16,
+        //  '#theme' => 'columns_checkboxes',
+    );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/
+function rate_form_submit($form, &$form_state) {
+    if ($form_state['values']['id']) {
+        $id = $form_state['values']['id'];
+        db_query("UPDATE voiptariff SET description = '%s', prefix = '%s', price = %f
+                , currencysym = '%s',initialincrement = %d, regularincrement = %d, graceperiod = %d
+                ,atime = %d,dtime = %d WHERE id = %d",
+            $form_state['values']['description'], $form_state['values']['prefix'],
+            $form_state['values']['price'], $form_state['values']['currencysym']
+            , $form_state['values']['initialincrement'], $form_state['values']['regularincrement'],
+            $form_state['values']['graceperiod']
+            ,$form_state['values']['atime'],$form_state['values']['dtime'],$form_state['values']['id']);
+        drupal_set_message("Rate  '".$form_state['values'][description]."' has been saved.");
+    }
+    else {
+        $rate = db_fetch_object(db_query("SELECT * from voiptariff WHERE grpid = %d and prefix = '%s' and atime=%d and atime=%d "
+                , $form_state['values']['grpid'],$form_state['values']['prefix'],
+                $form_state['values']['atime'],$form_state['values']['dtime']));
+        if ($rate) {
+            drupal_set_message("Found Rate <strong>'$rate->prefix'::$rate->grpid</strong> Can't Create.");
+            drupal_goto('rate');
+        }
+        db_query("INSERT INTO voiptariff(description,prefix,price,currencysym,initialincrement,regularincrement,graceperiod,grpid,atime,dtime)
+                Values('%s','%s',%f,'%s',%d,%d,%d,%d,%d,%d)",
+            $form_state['values']['description'], $form_state['values']['prefix'],
+            $form_state['values']['price'], $form_state['values']['currencysym']
+            , $form_state['values']['initialincrement'], $form_state['values']['regularincrement'],
+            $form_state['values']['graceperiod'],$form_state['values']['grpid'],
+            $form_state['values']['atime'],$form_state['values']['dtime']);
+        drupal_set_message("Rate  '".$form_state['values'][prefix]."' has been Created.");
+    }
+    drupal_goto('rate');
+}
+
+/**
+* Delete bookmark page
+*/
+function rate_lot_delete_confirm($id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from rate WHERE id = %d", $id));
+
+    if (!$rate) {
+        drupal_goto('card/lot');
+    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $rate->brand)),
+        $_GET['destination'] ? $_GET['destination'] : 'card/lot',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function rate_lot_delete_confirm_submit($form, &$form_state) {
+    if ($form['confirm']) {
+        db_query("DELETE FROM rate WHERE id = %d", $form['id']);
+        drupal_goto('card/lot');
+    }
+}
+
+
+function rate_group_form($form_state,$id = NULL) {
+    if ($id) {
+        $result = db_query("SELECT * FROM voiptariffgrp WHERE id = %d", $id);
+        $rate = db_fetch_object($result);
+        if (!$rate) {
+            return drupal_goto('rate/group');
+        }
+
+        $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+        );
+    }
+    // 	currencysym 	initialincrement 	regularincrement 	graceperiod
+    $form['description'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Destination"),
+        '#default_value' => $rate->description,
+        '#maxlength' => 255,
+        '#required' => true,
+    );
+    $form['service_charge'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Service Charge (%)"),
+        '#default_value' => $rate->service_charge,
+        '#maxlength' => 255,
+        '#required' => true,
+    );
+
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/
+function rate_group_form_submit($form, &$form_state) {
+    if ($form_state['values']['id']) {
+        $id = $form_state['values']['id'];
+        db_query("UPDATE voiptariffgrp SET description = '%s',service_charge = %s  WHERE id = %d",
+            $form_state['values']['description'],$form_state['values']['service_charge'], $form_state['values']['id']);
+        drupal_set_message("Rate Group '".$form_state['values'][description]."' has been saved.");
+    }
+    else {
+        db_query("INSERT into voiptariffgrp(description,service_charge) Values('%s',%s)", $form_state['values']['description'],
+            $form_state['values']['service_charge']);
+        drupal_set_message("Rate group  '".$form_state['values'][brand]."' has been Created.");
+    }
+    drupal_goto('rate/group');
+}
+
+function rate_group_delete_confirm($form_state,$id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from voiptariffgrp WHERE id = %d", $id));
+
+    if (!$rate) {
+        drupal_goto('rate/group');
+    }
+    $ck_group_inuse = db_fetch_object(db_query("SELECT * from  dr_users WHERE grpid = %d", $id));
+    if ($ck_group_inuse) {
+        drupal_set_message("Rate group  <strong>'$rate->description'</strong> inuse Can't Delete.");
+        drupal_goto('rate/group');
+    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %description?', array('%description' => $rate->description)),
+        $_GET['destination'] ? $_GET['destination'] : 'rate/group',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function rate_group_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+        db_query("DELETE FROM voiptariffgrp WHERE id = %d", $form_state['values']['id']);
+        drupal_goto('rate/group');
+    }
+}
+
+function rate_delete_confirm($form_state,$id = NULL) {
+    if ($id) {
+        $result = db_query("SELECT * FROM voiptariff WHERE id = %d", $id);
+        $rate = db_fetch_object($result);
+        if (!$rate) {
+            return drupal_goto('rate');
+        }
+
+        $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $rate->id,
+        );
+    } else {
+        return drupal_goto('rate');
+    };
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %description?', array('%description' => $rate->description)),
+        $_GET['destination'] ? $_GET['destination'] : 'rate/group',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function rate_delete_confirm_submit($form, &$form_state) {
+    if ($form['confirm']) {
+        db_query("DELETE FROM voiptariff WHERE id = %d", $form_state['values']['id']);
+        drupal_goto('rate');
+    }
+}
+

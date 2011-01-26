@@ -1,0 +1,8 @@
+name = Weos Incoming Prefix service
+description = A weos Incoming Prefix
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

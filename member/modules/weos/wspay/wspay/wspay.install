@@ -1,0 +1,39 @@
+<?php
+
+function wspay_install() {
+  drupal_install_schema('wspay');
+}
+  
+function wspay_schema() {
+  $schema['wspay'] = array(
+    'fields' => array(
+         'did' => array('type' => 'serial', 'not null' => TRUE, 'disp-width' => '10'),
+         'status' => array('type' => 'int', 'not null' => TRUE, 'default' => 1, 'disp-width' => '2'),
+         'name' => array('type' => 'varchar', 'length' => '128', 'not null' => FALSE),
+         'mail' => array('type' => 'varchar', 'length' => '128', 'not null' => FALSE),
+         'timestamp' => array('type' => 'int', 'not null' => TRUE, 'default' => 0, 'disp-width' => '11'),
+         'amount' => array('type' => 'float', 'not null' => FALSE),
+         'currency' => array('type' => 'varchar', 'length' => '5', 'not null' => FALSE, 'default' => 'USD'),
+         'uid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+         'donor_name' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+         'donor_url' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+         'donor_memo' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+         'paypal_txn_id' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+         'donor_comment' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE)),
+    'primary key' => array('did'),
+    'indexes' => array(
+         'donations_mail_idx' => array('mail'),
+         'donations_timestamp_idx' => array('timestamp'),
+         'donations_uid_idx' => array('uid')),
+  );
+  return $schema;
+}
+
+
+
+/**
+* Implementation of hook_uninstall().
+*/
+function wspay_uninstall() {
+  drupal_uninstall_schema('wspay');
+}

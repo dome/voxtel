@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/tuxza2/!svn/ver/2/trunk/www/modules/weos/currency/currency_api
+END
+API.txt
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/tuxza2/!svn/ver/2/trunk/www/modules/weos/currency/currency_api/API.txt
+END
+currency_api.module
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/tuxza2/!svn/ver/2/trunk/www/modules/weos/currency/currency_api/currency_api.module
+END
+currency_api.install
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/tuxza2/!svn/ver/2/trunk/www/modules/weos/currency/currency_api/currency_api.install
+END
+currency_api.info
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/tuxza2/!svn/ver/2/trunk/www/modules/weos/currency/currency_api/currency_api.info
+END

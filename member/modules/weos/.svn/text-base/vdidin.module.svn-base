@@ -1,0 +1,279 @@
+<?php
+function vdidin_menu() {
+    $items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+   
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+   
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+   
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+//    if ($may_cache) {
+
+
+        $items['weos/did'] = array(
+      'description' => 'View DID.', 'title' => 'DID',
+      'page callback' => 'vdidin_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+        'type' => MENU_NORMAL_ITEM,
+        );
+
+        $items['weos/did/list'] = array(
+      'description' => 'View DID.', 'title' => 'List',
+      'page callback' => 'vdidin_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+        );
+	
+        $items['weos/did/edit'] = array(
+      'title' => 'Edit Card',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vdidin_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+        $items['weos/did/delete'] = array(
+      'title' => 'Delete bookmarks',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vdidin_lot_delete_confirm'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+        $items['weos/did/add'] = array(
+      'title' => 'Add DID',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vdidin_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK);
+
+    return $items;
+}
+
+function vdidin_lot_delete_confirm($form_state,$id = NULL) {
+    $rate = db_fetch_object(db_query("SELECT * from voip_incom_did WHERE number = '%s'", $id));
+
+    if (!$rate) {
+        drupal_goto('weos/did');
+    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->number);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $rate->number)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/did',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function vdidin_lot_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+        db_query("DELETE FROM voip_incom_did WHERE number = '%s'", $form_state['values']['id']);
+        drupal_goto('weos/did');
+    }
+}
+
+
+function vdidin_form_overview() {
+
+    if (empty($_SESSION['vdidin_search_filter'])) {
+        $_SESSION['vdidin_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vdidin_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vdidin_overview() {
+    $header = array(
+        array('data' => t('Number'), 'field' => 'number'),
+        array('data' => t('Application'), 'field' => 'app'),
+        array('data' => t('Access Charge'), 'field' => 'price'),
+        array('data' => t('Operations'))
+    );
+    $output = drupal_get_form('vdidin_form_overview');
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vdidin_search_filter'];
+    $sql = "SELECT * from voip_incom_did ";
+    if ($search_str != '') {
+        $sql .= "  Where number LIKE '$search_str%' ";
+    }else
+    $sql .= " ";
+
+    //echo $sql;
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 50);
+
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->number,
+            $rate->app,
+            $rate->price,
+            array('data' => l('Edit','weos/did/edit/'.$rate->number).'  '.l('Del','weos/did/delete/'.$rate->number))
+            //	array('data' => l('Del','weos/did/delete/'.$rate->number)),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+/**
+ * Menu callback; generic function to display a page of the most frequent
+ * watchdog events of a specified type.
+ */
+function vdidin_top($type) {
+
+    $header = array(
+        array('data' => t('Count'), 'field' => 'count', 'sort' => 'desc'),
+        array('data' => t('Message'), 'field' => 'message')
+    );
+
+    $result = pager_query("SELECT COUNT(wid) AS count, message FROM {watchdog} WHERE type = '%s' GROUP BY message ". tablesort_sql($header), 30, 0, "SELECT COUNT(DISTINCT(message)) FROM {watchdog} WHERE type = '%s'", $type);
+
+    while ($watchdog = db_fetch_object($result)) {
+        $rows[] = array($watchdog->count, truncate_utf8($watchdog->message, 56, TRUE, TRUE));
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 2));
+    }
+
+    $output  = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+
+    return $output;
+}
+
+
+function vdidin_form_overview_submit($form, &$form_state) {
+    $_SESSION['vdidin_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vdidin_get_vdidin_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+
+function vdidin_form($form_state,$id = NULL) {
+
+    $names['ws-cc-pinless'] = 'Pinless Calling Card ';
+    $names['ws-cc'] = 'Calling Card ';
+    $names['ws-callback'] = 'Callback ';
+    $names['ws-callback-one'] = 'Callback One Stage';
+    $names['ws-free-callback'] = 'Free Callback ';
+    $names['ws-one-stage'] = 'One Stage Dialing ';
+    $names['ws-wholesale'] = 'Whoesale suffix with #';
+    $names['ws-topup'] = 'Top Up From PIN ';
+    $names['ws-transfer'] = 'Transfer Money ';
+
+    if ($id) {
+        $result = db_query("SELECT * FROM voip_incom_did WHERE number = '%s'", $id);
+        $did = db_fetch_object($result);
+
+        $form['id_edit'] = array(
+        '#type' => 'value',
+        '#value' => $id,
+        );
+
+    };
+
+    $form['number'] = array(
+    '#type' => 'textfield',
+    '#title' => t("DID Number"),
+    '#default_value' => $id,
+    '#description' => t("The brand of this card lot."),
+    '#maxlength' => 30,
+    '#required' => true,
+    );
+
+    $form['app'] = array(
+    '#type' => 'select',
+    '#title' => t("Application"),
+    '#options' => $names,
+    '#default_value' => $did->app,
+    '#required' => true,
+    );
+
+    $form['price'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Access Charge"),
+    '#default_value' => $did->price,
+    '#required' => true,
+    );
+
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vdidin_form_submit($form, &$form_state) {
+    global $user;
+    if (strlen($form_state['values']['id_edit']) > 0)
+    $result = db_query("UPDATE voip_incom_did set app='%s',price=%s where number = '%s'", $form_state['values'][app],
+        $form_state['values'][price],$form_state['values'][number]);
+    else {
+        $result = db_query("SELECT number from voip_incom_did WHERE  number='%s' ", $form_state['values'][number]);
+        $vuser = db_fetch_object($result);
+        if (!$vuser) {
+            db_query("INSERT into voip_incom_did(number,app,price) Values('%s','%s',%s)", $form_state['values']['number'],
+                $form_state['values']['app'], $form_state['values']['price']);
+
+        }else{
+            drupal_set_message("User/Number  '".$form_state['values'][username]."' found.");
+            return drupal_goto('weos/did');
+        }
+    };
+    drupal_goto('weos/did/list');
+}
+

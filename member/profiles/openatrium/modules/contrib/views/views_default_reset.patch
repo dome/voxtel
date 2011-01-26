@@ -1,0 +1,105 @@
+? views_default_reset.patch
+Index: views.module
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/views/views.module,v
+retrieving revision 1.341.2.4
+diff -u -p -r1.341.2.4 views.module
+--- views.module	5 Jan 2010 00:04:30 -0000	1.341.2.4
++++ views.module	24 Jan 2010 18:08:38 -0000
+@@ -698,18 +698,20 @@ function views_get_plugin($type, $plugin
+  * @return
+  *   A view object or NULL if it is not available.
+  */
+-function &views_get_default_view($view_name) {
++function &views_get_default_view($view_name, $reset = FALSE) {
+   $null = NULL;
+ 
+   // Attempt to load individually cached view from cache.
+   views_include('cache');
+-  $data = views_cache_get("views_default:{$view_name}", TRUE);
+-  if (isset($data->data) && is_object($data->data)) {
+-    return $data->data;
++  if (!$reset) {
++    $data = views_cache_get("views_default:{$view_name}", TRUE);
++    if (isset($data->data) && is_object($data->data)) {
++      return $data->data;
++    }
+   }
+ 
+   // Otherwise, allow entire cache to be rebuilt.
+-  $cache = views_discover_default_views();
++  $cache = views_discover_default_views($reset);
+   if (isset($cache[$view_name])) {
+     return $cache[$view_name];
+   }
+@@ -737,12 +739,12 @@ function views_new_view() {
+  *
+  * @return An associative array of all known default views.
+  */
+-function views_discover_default_views() {
++function views_discover_default_views($reset = FALSE) {
+   static $cache = array();
+ 
+-  if (empty($cache)) {
++  if (empty($cache) || $reset) {
+     views_include('cache');
+-    $cache = _views_discover_default_views();
++    $cache = _views_discover_default_views($reset);
+   }
+   return $cache;
+ }
+@@ -817,7 +819,7 @@ function views_get_all_views($reset = FA
+     // Get all default views.
+     $status = variable_get('views_defaults', array());
+ 
+-    foreach (views_discover_default_views() as $view) {
++    foreach (views_discover_default_views($reset) as $view) {
+       // Determine if default view is enabled or disabled.
+       if (isset($status[$view->name])) {
+         $view->disabled = $status[$view->name];
+@@ -855,7 +857,7 @@ function views_get_all_views($reset = FA
+ function views_get_view($name, $reset = FALSE) {
+   views_include('view');
+   $view = view::load($name, $reset);
+-  $default_view = views_get_default_view($name);
++  $default_view = views_get_default_view($name, $reset);
+ 
+   if (empty($view) && empty($default_view)) {
+     return;
+Index: includes/cache.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/views/includes/cache.inc,v
+retrieving revision 1.25.2.2
+diff -u -p -r1.25.2.2 cache.inc
+--- includes/cache.inc	5 Jan 2010 01:44:50 -0000	1.25.2.2
++++ includes/cache.inc	24 Jan 2010 18:08:38 -0000
+@@ -96,14 +96,14 @@ function _views_fetch_plugin_data($type 
+  *
+  * @return An associative array of all known default views.
+  */
+-function _views_discover_default_views() {
++function _views_discover_default_views($reset = FALSE) {
+   static $cache = NULL;
+ 
+-  if (!isset($cache)) {
++  if (!isset($cache) || $reset) {
+     $index = views_cache_get('views_default_views_index');
+ 
+     // Retrieve each cached default view
+-    if (isset($index->data) && is_array($index->data)) {
++    if (!$reset && isset($index->data) && is_array($index->data)) {
+       $cache = array();
+       foreach ($index->data as $view_name) {
+         $data = views_cache_get('views_default:' . $view_name, TRUE);
+@@ -115,10 +115,9 @@ function _views_discover_default_views()
+     // If missing index, rebuild the cache
+     else {
+       views_include_default_views();
+-      $defaults = module_invoke_all('views_default_views');
+       $cache = array();
+ 
+-      foreach(module_implements('views_default_views') as $module) {
++      foreach (module_implements('views_default_views') as $module) {
+         $results = call_user_func($module . "_views_default_views");
+         if (!empty($results) && is_array($results)) {
+           foreach($results as $name => $view) {

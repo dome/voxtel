@@ -1,0 +1,8 @@
+name = Weos Reseller Module
+description = A weos Reseller Module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

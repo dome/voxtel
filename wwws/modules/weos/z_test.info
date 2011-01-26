@@ -1,0 +1,8 @@
+name = Z Test 
+description = Z Test
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

@@ -1,0 +1,267 @@
+<?php
+function vincoming_menu() {
+    $items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+    if ($may_cache) {
+
+        $items['weos/incoming'] = array(
+      'description' => 'View Incoming DID.', 'title' => 'Incomin DID',
+      'page callback' => 'vincoming_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+    'type' => MENU_NORMAL_ITEM,
+        );
+
+        $items['weos/incoming/list'] = array(
+      'description' => 'View Incoming DID.', 'title' => 'List',
+      'page callback' => 'vincoming_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+        );
+
+        $items['weos/incoming/edit/'] = array(
+      'title' => 'Edit Incoming DID',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vincoming_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+
+        $items['weos/incoming/delete'] = array(
+      'title' => 'Delete Incoming DID',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vincoming_delete_confirm'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+
+        $items['weos/incoming/add'] = array(
+      'title' => 'Add Incoming DID',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vincoming_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK);
+
+    }
+    return $items;
+}
+
+function vincoming_form_overview() {
+
+    if (empty($_SESSION['vincoming_search_filter'])) {
+        $_SESSION['vincoming_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vincoming_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+    //  $form['#redirect'] = FALSE;
+
+    return $form;
+}
+
+function vincoming_overview() {
+    $header = array(
+        array('data' => t('DID'), 'field' => 'did'),
+        array('data' => t('Application'), 'field' => 'app'),
+        array('data' => t('')),
+        array('data' => t(''))
+    );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vincoming_search_filter'];
+    $sql = "SELECT * from voip_incoming ";
+    if ($search_str != '') {
+        $sql .= "  Where did LIKE '$search_str%' ";
+    }else
+    $sql .= " ";
+
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 50);
+
+    $names = array();
+    $names['callingcard'] = "Calling Card";
+    $names['callback'] = "Calling Back";
+    $names['freecallback'] = "Free Calling Back";
+    $names['tollfreecallingcard'] = "Toll free Calling Card";
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->did,
+            $names[$rate->app],
+            array('data' => l('Edit','weos/incoming/edit/'.$rate->id)),
+            array('data' => l('Del','weos/incoming/delete/'.$rate->id)),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+/**
+ * Menu callback; generic function to display a page of the most frequent
+ * watchdog events of a specified type.
+ */
+function vincoming_top($type) {
+
+    $header = array(
+        array('data' => t('Count'), 'field' => 'count', 'sort' => 'desc'),
+        array('data' => t('Message'), 'field' => 'message'),
+        array('data' => l('Edit','weos/incoming/edit/'.$rate->id)),
+        array('data' => l('Del','weos/incoming/delete/'.$rate->id)),
+    );
+
+    $result = pager_query("SELECT COUNT(wid) AS count, message FROM {watchdog} WHERE type = '%s' GROUP BY message ". tablesort_sql($header), 30, 0, "SELECT COUNT(DISTINCT(message)) FROM {watchdog} WHERE type = '%s'", $type);
+
+    while ($watchdog = db_fetch_object($result)) {
+        $rows[] = array($watchdog->count, truncate_utf8($watchdog->message, 56, TRUE, TRUE));
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output  = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+
+    return $output;
+}
+
+
+function vincoming_form_overview_submit($form, &$form_state) {
+    $_SESSION['vincoming_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vincoming_get_vincoming_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+//$form_state['values']
+function vincoming_form($form_state = array(),$id = NULL) {
+    global $user,$balance;
+    echo $id;
+    die;
+    if ($id) {
+        $result = db_query("SELECT * FROM voip_incoming WHERE id = %d", $id);
+        $did = db_fetch_object($result);
+
+        $form['id'] = array(
+      '#type' => 'value',
+      '#value' => $did->id,
+        );
+    };
+
+    $form['did'] = array(
+    '#type' => 'textfield',
+    '#title' => t("DID"),
+    '#default_value' => $did->did,
+    '#maxlength' => 25,
+    '#required' => true,
+    );
+
+    $names = array();
+    $names['callingcard'] = "Calling Card";
+    $names['callback'] = "Calling Back";
+    $names['onestage'] = "One Stage Dialing";
+    $names['freecallback'] = "Free Calling Back";
+    $names['tollfreecallingcard'] = "Toll free Calling Card";
+
+    $form['app'] = array(
+    '#type' => 'select',
+    '#title' => t("Application"),
+    '#options' => $names,
+    '#default_value' => $did->app,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+
+function vincoming_form_submit($form, &$form_state) {
+    global $user;
+    if ($form_state['values']['id']) {
+        $id = $form_state['values']['id'];
+        db_query("UPDATE voip_incoming SET did = '%s', app = '%s' WHERE id = %d",
+            $form_state['values']['did'], $form_state['values']['app'], $form_state['values']['id']);
+        drupal_set_message("DID  '".$form_state['values'][did]."' has been saved.");
+    }
+    else {
+        db_query("INSERT into voip_incoming(did,app) Values('%s','%s')", $form_state['values']['did'], $form_state['values']['app']);
+        drupal_set_message("DID '".$form_state['values'][did]."' has been create.");
+    }
+    drupal_goto('weos/incoming/list');
+}
+
+function vincoming_delete_confirm($id = NULL) {
+    global $user;
+    $rate = db_fetch_object(db_query("SELECT * from voip_incoming WHERE id=%d ", $id));
+
+    if (!$rate) {
+        drupal_set_message("DID Not Found.",'error');
+        drupal_goto('weos/incoming/list');
+    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %description?', array('%description' => $rate->did)),
+        $_GET['destination'] ? $_GET['destination'] : 'weos/incoming/list',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function vincoming_delete_confirm_submit($form, &$form_state) {
+    global $user;
+    print_r($form);
+    if ($form_state['values']['confirm']) {
+        db_query("DELETE FROM voip_incoming WHERE id=%d ", $form_state['values']['id']);
+        drupal_goto('weos/incoming/list');
+    }
+}

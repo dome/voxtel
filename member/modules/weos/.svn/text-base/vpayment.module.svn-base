@@ -1,0 +1,243 @@
+<?php
+
+/**
+ * Implementation of hook_menu().
+ */
+function vpayment_menu() {
+    $items['weos/payment'] = array(
+      'description' => 'View payment.', 'title' => 'Payment',
+      'page callback' => 'vpayment_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+    'type' => MENU_NORMAL_ITEM,
+    );
+
+    $items['weos/payment/list'] = array(
+      'description' => 'View payment.', 'title' => 'List',
+      'page callback' => 'vpayment_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+    );
+    $items['weos/payment/edit'] = array(
+      'title' => 'Edit Card',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vpayment_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+    $items['weos/payment/delete'] = array(
+      'title' => 'Delete bookmarks',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vpayment_lot_delete_confirm'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+    $items['weos/payment/add'] = array(
+      'title' => 'Pay Back',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vpayment_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK);
+
+    return $items;
+}
+
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vpayment_cron() {
+    //  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+    //  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vpayment_user($op, &$edit, &$user) {
+
+}
+
+function vpayment_form_overview() {
+
+    if (empty($_SESSION['vpayment_search_filter'])) {
+        $_SESSION['vpayment_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vpayment_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+    //  $form['#redirect'] = FALSE;
+
+    return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vpayment_overview() {
+    $header = array(
+        array('data' => t('Date'), 'field' => 'date', 'sort' => 'desc'),
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Amount'), 'field' => 'paid'),
+        array('data' => t('Ref'), 'field' => 'ref'),
+        array('data' => t('Operations'))
+    );
+    $output = drupal_get_form('vpayment_form_overview');
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vpayment_search_filter'];
+    $sql = "SELECT voippayment.accountid, voipusers.username, voippayment.ref,
+          CASE
+                  WHEN voippayment.paid > 0::numeric THEN to_number(voippayment.paid::text, '9999999.99'::text)
+                          ELSE 0::numeric - to_number(voippayment.paid_out::text, '9999999.99'::text)
+                          END AS paid, voippayment.date
+                         FROM voippayment
+                            LEFT JOIN voipusers ON voippayment.accountid = voipusers.accountid";
+    //  $sql="Select username,duration As paid,tariffdesc As ref from voipcall";
+    if ($search_str != '') {
+        $sql .= "  Where username LIKE '$search_str%' Or ref Like '$search_str%'";
+    }else
+    $sql .= " ";
+
+    //echo $sql;
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 50);
+
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->date,
+            $rate->username,
+            $rate->paid,
+            $rate->ref,
+    '',
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+/**
+ * Menu callback; generic function to display a page of the most frequent
+ * watchdog events of a specified type.
+ */
+function vpayment_top($type) {
+
+    $header = array(
+        array('data' => t('Count'), 'field' => 'count', 'sort' => 'desc'),
+        array('data' => t('Message'), 'field' => 'message')
+    );
+
+    $result = pager_query("SELECT COUNT(wid) AS count, message FROM {watchdog} WHERE type = '%s' GROUP BY message ". tablesort_sql($header), 30, 0, "SELECT COUNT(DISTINCT(message)) FROM {watchdog} WHERE type = '%s'", $type);
+
+    while ($watchdog = db_fetch_object($result)) {
+        $rows[] = array($watchdog->count, truncate_utf8($watchdog->message, 56, TRUE, TRUE));
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 2));
+    }
+
+    $output  = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+
+    return $output;
+}
+
+
+function vpayment_form_overview_submit($form, &$form_state) {
+    $_SESSION['vpayment_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vpayment_get_vpayment_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+
+function vpayment_form($form_state = array(),$id = NULL) {
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username/Number"),
+    '#default_value' => $id,
+    '#description' => t("The brand of this card lot."),
+    '#maxlength' => 30,
+    '#required' => true,
+    );
+
+    $form['paid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Value"),
+    '#default_value' => $voippayment->paid,
+    '#required' => true,
+    );
+
+    $form['ref'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Ref"),
+    '#default_value' => $voippayment->ref,
+    '#required' => true,
+    );
+
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vpayment_form_submit($form, &$form_state) {
+    global $user;
+    if ($form_state['values']['id']) {
+        $id = $form_state['values']['id'];
+        db_query("UPDATE voippayment SET brand = '%s', days_expire = %d, days_use_expire = %d, qty = %d, price = %d
+    , currency = '%s',rate = %d WHERE id = %d", $form_state['values']['brand'], $form_state['values']['days_expire'],
+            $form_state['values']['days_use_expire'], $form_state['values']['qty']
+            , $form_state['values']['price'], $form_state['values']['currency'],$form_state['values']['rategr'], $form_state['values']['id']);
+        drupal_set_message("Card  '".$form_state['values'][brand]."' has been saved.");
+    }
+    else {
+        $result = db_query("SELECT accountid FROM vuser WHERE  username = '%s' or number='%s' ", $form_state['values'][username],$form_state['values'][username]);
+        $vuser = db_fetch_object($result);
+        if (!$vuser) {
+            drupal_set_message("User/Number  '".$form_state['values'][username]."' Not found.");
+            return drupal_goto('weos/payment');
+        }
+
+        //    db_query("SELECT create_card_cur(%d,%d,%d,%d,1,%d,'%s','%s')",
+        //    $form['qty'], $form['price'], $form['days_expire'],$form['days_use_expire'],$form['rategr'],$form['brand'], $form['currency']);
+        db_query("INSERT into voippayment(accountid,ref,paid) Values(%d,'%s',%d)", $vuser->accountid, $form_state['values']['ref'], $form_state['values']['paid']);
+        watchdog('user', "Pay Back '".$form_state['values'][paid]."' to Account '".$form_state['values'][username]."' By $user->name");
+        drupal_set_message("Pay Back '".$form_state['values'][paid]."' to Account '".$form_state['values'][username]."' Done.");
+    }
+    drupal_goto('weos/payment/list');
+}
+

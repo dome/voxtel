@@ -1,0 +1,82 @@
+<?php
+
+function vrate_menu() {
+	$items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+   
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+   
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+   
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+	if ($may_cache) {
+
+		$items['rate'] = array(
+                'description' => 'Rate System.', 'title' => 'Rate',
+                'page callback' => 'drupal_get_form',
+                'weight' => -1,
+                'page arguments' => array('vrate_form'),
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK
+		);
+
+		
+		$items['rate/autocomplete'] = array(
+    		'title' => 'Autocomplete Rate',
+    		'page callback' => 'vrate_autocomplete',
+		'access arguments' => array('access content'),
+    		'type' => MENU_CALLBACK);
+
+        
+	}
+	return $items;
+}
+
+function vrate_form() {
+	$form['rate'] = array(
+	'#type' => 'textfield',
+	'#title' => t("Search:"),
+        '#default_value' => isset($rate) ? $rate : '',
+        '#required' => TRUE,
+	'#description' => t("Input Country Or Code."),
+	'#autocomplete_path' => 'rate/autocomplete/'
+	);
+	return $form;
+}
+
+function vrate_autocomplete($string = '') {
+/*
+  $matches["Thailand"] = "Thailand";
+  $matches[2] = "xczxcThailand";
+  $matches["ccc"] = $string;
+  print drupal_to_js($matches);
+    exit();
+*/
+
+  if ($string != '') {
+    $sql = " SELECT prefix,description,price,currencysym FROM rate_view WHERE grpid=1 AND description LIKE '%".$string."%'".
+             "Or prefix LIKE '".$string."%'";
+    $result = pager_query($sql, 50,0);
+    $matches = array();
+    while ($rate = db_fetch_object($result)) {
+      $d = $rate->prefix.' '.$rate->description.'  Rate:'.$rate->price.' '.$rate->currencysym;
+      $matches[$d] = check_plain($d);
+    }
+    print drupal_to_js($matches);
+    exit();
+  }
+}

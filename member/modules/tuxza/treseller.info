@@ -1,0 +1,6 @@
+name = Weos Reseller Module
+description = A weos Reseller Module
+package = TuxZA
+version = "5.0"
+project = "TuxZA"
+core = 6.x

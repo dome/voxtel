@@ -1,0 +1,17 @@
+--- ckeditor.install	2010-01-12 05:01:20.000000000 -0500
++++ ckeditor.install.fixed	2010-03-08 22:47:33.000000000 -0500
+@@ -263,11 +263,12 @@ function ckeditor_schema() {
+  * - Quick upload and/or the built-in file browser are used and $cookie_domain is not set
+  */
+ function ckeditor_requirements($phase) {
+-  module_load_include('module', 'ckeditor');
+-  module_load_include('inc', 'ckeditor', 'includes/ckeditor.lib');
+   $requirements = array();
+ 
+   if ($phase == 'runtime') {
++    module_load_include('module', 'ckeditor');
++    module_load_include('inc', 'ckeditor', 'includes/ckeditor.lib');
++  
+     $requirements['ckeditor'] = array(
+     'title' => t('CKEditor'),
+     'value' => t('Unknown'),

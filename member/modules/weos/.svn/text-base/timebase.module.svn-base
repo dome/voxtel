@@ -1,0 +1,443 @@
+<?php
+function timebase_menu() {
+    $items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+   
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+   
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+   
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+        
+        
+            $items['weos/timebase'] = array(
+                'description' => 'Time Base.', 'title' => 'Time Base',
+                'page callback' => 'timebase_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_NORMAL_ITEM,
+                );	
+        
+            $items['weos/timebase/list'] = array(
+                'description' => 'Time Base.', 'title' => 'List',
+                'page callback' => 'timebase_overview',
+                'weight' => -1,
+                'access arguments' => array('access rate'),
+                'type' => MENU_DEFAULT_LOCAL_TASK
+                );	
+            $items['weos/timebase/edit'] = array(
+                'title' => 'Edit Time Base',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('timebase_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+            $items['weos/timebase/delete'] = array(
+                'title' => 'Delete Time Base',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('timebase_delete_confirm'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_CALLBACK);
+            $items['weos/timebase/add'] = array(
+                'title' => 'Add',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('timebase_form'),
+                'access arguments' => array('access rate'),
+                'type' => MENU_LOCAL_TASK);
+        
+    return $items;
+}
+
+/**
+* Menu callback; displays a listing of log messages.
+*/
+function timebase_overview() {
+//username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+    $header = array(
+        array('data' => t('Desc'), 'field' => 'name'),
+        array('data' => t('From Date'),),
+        array('data' => t(' To '),),
+        array('data' => t('Date'),),
+        array('data' => t('Day Of Week'), 'field' => 'dow'),
+        array('data' => t('Day Of Month'), 'field' => 'dom'),
+        array('data' => t('Month'), 'field' => 'mon'),
+        array('data' => t('  '),),
+        
+        );
+
+    $tablesort = tablesort_sql($header);
+    $sql = "SELECT *,to_char(st_date,'DD-MM-YYYY') As tst_date,to_char(end_date,'DD-MM-YYYY') As tend_date from ws_time_base";
+    $sql_count = "SELECT count(id) from ws_time_base";
+
+    $result = pager_query($sql . $tablesort, 20,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+            $rows[] =  array(
+                // Cells
+                $rate->name,
+                $rate->tst_date.' '.
+                $rate->st_time,
+                " - ",
+                $rate->tend_date.' '.
+                $rate->end_time,
+                $rate->dow,
+                $rate->dom,
+                $rate->mon,
+                l('Edit','weos/timebase/edit/'.$rate->id)." ".l('Delete','weos/timebase/delete/'.$rate->id),  
+                );
+        }
+
+    if (!$rows) {
+            $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+        }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 20, 0);
+
+    return $output;
+}
+
+
+function timebase_form($form_state,$id = NULL) {
+    if ($id) {
+            $result = db_query("SELECT *,to_char(st_date,'DD-MM-YYYY') As tst_date,to_char(end_date,'DD-MM-YYYY') As tend_date FROM ws_time_base WHERE id = %d", $id);
+            $data = db_fetch_object($result);
+            if (!$data) {
+                    return drupal_goto('weos/timebase');
+                }
+        
+            $form['id'] = array(
+                '#type' => 'value',
+                '#value' => $data->id,
+                );
+        }
+
+    $form['name'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Description"),
+        '#default_value' => $data->name,
+        '#description' => t("The Description of this time base."),
+        '#maxlength' => 255,
+        '#required' => true,
+        );
+    $form['stdate'] = array(                                                                                                                             
+        '#prefix' => '<div class="container-inline">',
+        '#type' => 'textfield',                                                                                                                          
+        '#title' => t("Start Date"),
+        '#attributes' => array('class' => 'jscalendar'),                                                                                                 
+        '#default_value' => $data->tst_date,
+        '#jscalendar_showsTime' => 'false',
+        '#jscalendar_ifFormat' => '%d-%m-%Y', 
+        '#jscalendar_timeFormat' => '24', 
+        );       
+    $form['sttime'] = array(                                                                                                                             
+        '#type' => 'textfield',                                                                                                                          
+        '#title' => t("Time"),
+        '#attributes' => array('class' => 'jscalendar'),                                                                                                 
+        '#default_value' => $data->st_time,   
+        '#jscalendar_showsTime' => 'true',
+        '#jscalendar_ifFormat' => '%H:%M', 
+        '#jscalendar_timeFormat' => '24', 
+        '#suffix' => '</div>',
+        );       
+    $form['enddate'] = array(                                                                                                                             
+        '#prefix' => '<div class="container-inline">',
+        '#type' => 'textfield',                                                                                                                          
+        '#title' => t("End Date"),
+        '#attributes' => array('class' => 'jscalendar'),                                                                                                 
+        '#default_value' => $data->tend_date,   
+        '#jscalendar_showsTime' => 'false',
+        '#jscalendar_ifFormat' => '%d-%m-%Y', 
+        '#jscalendar_timeFormat' => '24', 
+        );       
+    $form['endtime'] = array(                                                                                                                             
+        '#type' => 'textfield',                                                                                                                          
+        '#title' => t("Time"),
+        '#attributes' => array('class' => 'jscalendar'),                                                                                                 
+        '#default_value' => $data->end_time,   
+        '#jscalendar_showsTime' => 'true',
+        '#jscalendar_ifFormat' => '%H:%M', 
+        '#jscalendar_timeFormat' => '24', 
+        '#suffix' => '</div>',
+        );       
+    $dow[1]="Sun"; 
+    $dow[2]="Mon"; 
+    $dow[3]="Tue"; 
+    $dow[4]="Wed"; 
+    $dow[5]="Thu"; 
+    $dow[6]="Fri"; 
+    $dow[7]="Sat"; 
+        //$dow_check[1]=true;
+        //$dow_check[2]=true;
+    $mystr = str_replace('{','',$data->dow);
+    $mystr = str_replace('}','',$mystr);
+    $dow_ar = explode(",", $mystr);
+    $k = count($dow_ar) - 1;
+    $i = 0;
+    for ($i=0;$i<=$k;$i++){
+            $dow_check[$dow_ar[$i]]=1;
+            };    
+        //    $dow_check[2]=1;
+        //    $dow_check[3]=1;
+        //  $dow_check[4]=0;
+        //  $dow_check[5]=0;
+        //    $dow_check[6]=1;
+        //    $dow_check[7]=1;
+
+    $form['dow'] = array(
+        '#title' => t("Day Of Week"),
+        '#type' => 'checkboxes',
+        '#options' => $dow,
+        '#value' => $dow_check,   
+        '#columns' => 7,
+        '#theme' => 'columns_checkboxes',
+        );
+    $i=1;
+    for ($i>0;$i<=31;$i++){
+            $dom[$i]=$i;
+        }
+    $mystr = str_replace('{','',$data->dom);
+    $mystr = str_replace('}','',$mystr);
+    $dom_ar = explode(",", $mystr);
+    $k = count($dom_ar) - 1;
+    $i = 0;
+    for ($i=0;$i<=$k;$i++){
+            $dom_check[$dom_ar[$i]]=1;
+            };    
+
+    $form['dom'] = array(
+        '#title' => t("Day Of Month"),
+        '#type' => 'checkboxes',
+        '#options' => $dom,
+        '#value' => $dom_check,   
+        '#columns' => 16,
+        '#theme' => 'columns_checkboxes',
+        );
+    $i=1;    
+        //    for ($i>0;$i<=12;$i++){
+        //            $mon[$i]=$i;
+        //        }
+        //select EXTRACT(DOW FROM CURRENT_DATE),CURRENT_TIME,* from ws_time_base where CURRENT_TIME between st_time and end_time AND EXTRACT(DOW FROM CURRENT_DATE)::text = ANY (dow);
+    $mon[1]="Jan";
+    $mon[2]="Feb";
+    $mon[3]="Mar";
+    $mon[4]="Apr";
+    $mon[5]="May";
+    $mon[6]="Jun";
+    $mon[7]="Jul";
+    $mon[8]="Aug";
+    $mon[9]="Sep";
+    $mon[10]="Oct";
+    $mon[11]="Nov";
+    $mon[12]="Dec";
+
+    $mystr = str_replace('{','',$data->mon);
+    $mystr = str_replace('}','',$mystr);
+    $mon_ar = explode(",", $mystr);
+    $k = count($mon_ar) - 1;
+    $i = 0;
+    for ($i=0;$i<=$k;$i++){
+            $mon_check[$mon_ar[$i]]=1;
+            };    
+
+
+    $form['mon'] = array(
+        '#title' => t("Month"),
+        '#type' => 'checkboxes',
+        '#options' => $mon,
+        '#value' => $mon_check,   
+        '#columns' => 12,
+        '#theme' => 'columns_checkboxes',
+        );
+        /*
+        
+        ( -1.00) set tz=+01+01     Azores, CapeVerde Is. =60
+        ( -2.00) set tz=+02+02 Mid-Atlantic =120
+        ( -3.00) set tz=+03+03     Buenos Aires,Rio de Janiero,E. South America =180
+        ( -3.30) set tz=Nwf+03:30  Newfoundland =210
+        ( -4.00) set tz=AST+04ADT  Atlantic Time (Canada) ,Caracas,La Paz =240
+        ( -5.00) set tz=EST+05EDT  Eastern Time (US & Canada),Bogota, Lima, Indiana (East) =300
+        ( -6.00) set tz=CST+06CDT  Central Time (US & Canada),Mexico City, Tegucigalpa, Saskatchewan =360
+        ( -7.00) set tz=MST+07MDT  Mountain Time (US & Canada),Arizona =420
+        ( -8.00) set tz=PST+08PDT  Pacific Time (US & Canada),San Francisco, LA, Tijuana =480
+        ( -9.00) set tz=+09+09     Alaska =540
+        (-10.00) set tz=+10+10     Hawaii =600
+        (-11.00) set tz=+11+11     Midway Island,Samoa =660
+        (-12.00) set tz=+12+12     Enewetak,Kwajalein,Dateline =720
+        (0   )  set tz=GMT000    Greenwich Mean Time; London, Edinburgh, Dublin, Casablanca, Monrovia =0
+        ( 1.00) set tz=MEZ-01     Paris, Berlin,Madrid, Stockholm, Rome,W. Europe =-60
+        ( 2.00) set tz=OEZ-02     Athens, Helsinki,Istanbul,E. Europe, Harare, Pretoria,South Africa, Israel =-120
+        ( 3.00) set tz=-03-03     Baghdad, Kuwait,Nairobi, Riyadh,Saudi , Moscow, St. Petersburg =-180
+        ( 3.30)                  Tehran,Iran =-210
+        ( 4.00) set tz=-04-04     Abu Dhabi,Muscat, Tbilisi, Kazan, Volgograd,Arabia =-240
+        ( 4.30)                  Kabul,Afghanistan =-270
+        ( 5.00) set tz=-05-05     Islamabad,Karachi, Sverdlovsk, Tashkent,West Asia =-300
+        ( 5.30)                  Bombay, Calcutta, Madras, New Delhi, Colombo,India =-330
+        ( 6.00) set tz=-06-06     Alma Ata,Dhaka,Central Asia =-360
+        ( 7.00) set tz=-07-07     Bangkok, Jakarta,Hanoi,Bangkok =-420
+        ( 8.00) set tz=-08-08     Beijing, Chongqing,Urumqi, Hong Kong, Perth, Singapore =-480
+        ( 9.00) set tz=-09-09     Tokyo, Osaka,Sapporo, Seoul, Yakutsk =-540
+        ( +9:30) set tz=???-09:30  Adelaide,Central Australia,Darwin =-570
+        ( 10.00) set tz=-10-10    Brisbane, Melbourne,Sydney, Guam, Port Moresby, Vladivostok,West Pacific, Hobart =-600
+        ( 11.00) set tz=-11-11    Magadan, SolomanIs., New Caledonia,Central Pacific =-660
+        ( 12.00) set tz=-12-12    Fiji, Kamchatka,Marshall Is., Wellington, Auckland,New Zealand =-720 
+        */
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+        );
+
+    return $form;
+}
+
+/**
+* Add/Edit bookmark form submit
+*/
+function timebase_form_submit($form, &$form_state) {
+//print_r($form['dow']);
+//print_r($form);
+//return;
+//convert array to string for update postgresql
+    $mon_str = "{";
+    for ($i=1;$i<13;$i++){
+        //echo $i.":".$form['mon'][$i]."<br>";
+            if ($form_state['values']['mon'][$i]>0)
+                    $mon_str .= $i.",";
+                        //echo $form['mon'][$i];
+        }
+    if (strlen($mon_str)>2)
+            $mon_str = substr($mon_str, 0, -1);    
+    $mon_str .= "}";
+    $dow_str = "{";
+
+    for ($i=0;$i<8;$i++){
+            if ($form_state['values']['dow'][$i]>0)
+                    $dow_str .= $i.",";
+                        //echo $form['mon'][$i];
+        }
+    if (strlen($dow_str)>2)
+            $dow_str = substr($dow_str, 0, -1);    
+    $dow_str .= "}";
+    $dom_str = "{";
+    for ($i=1;$i<=31;$i++){
+            if ($form_state['values']['dom'][$i]>0)
+                    $dom_str .= $i.",";
+        }
+    if (strlen($dom_str)>2)
+            $dom_str = substr($dom_str, 0, -1);    
+    $dom_str .= "}";
+
+    if ($form_state['values']['id']) {
+            $id = $form_state['values']['id'];
+            db_query("SET datestyle TO ISO, DMY;");
+            db_query("UPDATE ws_time_base  SET name='%s',mon = '%s',dow = '%s',dom = '%s',st_date='%s'
+                ,st_time = '%s',end_date='%s',end_time='%s'
+                WHERE id = %d", $form_state['values']['name'],$mon_str,$dow_str,$dom_str,
+            $form_state['values']['stdate'],$form_state['values']['sttime']
+                ,$form_state['values']['enddate'],$form_state['values']['endtime'],$form_state['values']['id']);
+            drupal_set_message("Time Base  '".$form_state['values'][name]."' has been saved.");
+        }
+        else {
+        //create_card_cur
+        /*
+        co ALIAS FOR $1;
+        value ALIAS FOR $2;
+        days ALIAS FOR $3;
+        days_use ALIAS FOR $4;
+        muid ALIAS FOR $5;
+        rategr ALIAS FOR $6;
+        nbrand ALIAS FOR $7;
+        ncur ALIAS FOR $8;
+        integer, numeric, integer, integer, integer, integer, text, text
+        */
+            db_query("SET datestyle TO ISO, DMY;");
+            db_query("INSERT INTO ws_time_base(name,st_date,st_time,end_date,end_time,dow,dom,mon) 
+                Values('%s','%s','%s','%s','%s','%s','%s','%s');",$form_state['values']['name'],
+            $form_state['values']['stdate'],$form_state['values']['sttime']
+                ,$form_state['values']['enddate'],$form_state['values']['endtime'],$dow_str,$dom_str,$mon_str);
+            drupal_set_message("Time Base  '".$form_state['values'][name]."' has been Created.");
+        }
+    drupal_goto('weos/timebase');
+}
+
+/**
+* Delete bookmark page
+*/
+function timebase_lot_delete_confirm($form_state,$id = NULL) {
+    $card_lot = db_fetch_object(db_query("SELECT * from card_lot WHERE id = %d", $id));
+
+    if (!$card_lot) {
+            drupal_goto('weos/card/lot');
+        }
+
+    $form['id'] = array('#type' => 'value', '#value' => $card_lot->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $card_lot->brand)), 
+        $_GET['destination'] ? $_GET['destination'] : 'weos/card/lot', 
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')  
+        );
+}
+
+function timebase_lot_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM card_lot WHERE id = %d", $form_state['values']['id']);
+            drupal_goto('weos/card/lot');
+        }
+}
+function _ws_timebaselist() {
+            $tlist = array();
+            $result = db_query('SELECT DISTINCT(name) As name ,id FROM ws_time_base ORDER BY name');
+            while ($object = db_fetch_object($result)) {
+                    $tlist[$object->id] = $object->name;
+                }
+    return $tlist;
+};
+function _ws_zonelist() {
+    $zones[-12*3600] = "GMT-12 Enewetak,Kwajalein,Dateline";
+    $zones[-11*3600] = "GMT-11 Midway Island,Samoa";
+    $zones[-10*3600] = "GMT-10 Hawaii";
+    $zones[-9*3600] = "GMT-9 Alaska";
+    $zones[-8*3600] = "GMT-8 Pacific Time (US & Canada),San Francisco, LA, Tijuana";
+    $zones[-7*3600] = "GMT-7 Mountain Time (US & Canada),Arizona";
+    $zones[-6*3600] = "GMT-6 Central Time (US & Canada),Mexico City, Tegucigalpa, Saskatchewan";
+    $zones[-5*3600] = "GMT-5 Eastern Time (US & Canada),Bogota, Lima, Indiana (East)";
+    $zones[-4*3600] = "GMT-4 Atlantic Time (Canada) ,Caracas,La Paz";
+    $zones[-3.30*3600] = "GMT-3.30 Newfoundland";
+    $zones[-3.00*3600] = "GMT-3 Buenos Aires,Rio de Janiero,E. South America";
+    $zones[-2*3600] = "GMT-2 Mid-Atlantic";
+    $zones[-1*3600] = "GMT-1 Azores, CapeVerde Is";
+    $zones[0] = "GMT Greenwich Mean Time; London, Edinburgh, Dublin, Casablanca, Monrovia";
+    $zones[1*3600] = "GMT+1 Paris, Berlin,Madrid, Stockholm, Rome,W. Europe";
+    $zones[2*3600] = "GMT+2 Athens, Helsinki,Istanbul,E. Europe, Harare, Pretoria,South Africa, Israel";
+    $zones[3*3600] = "GMT+3 Baghdad, Kuwait,Nairobi, Riyadh,Saudi , Moscow, St. Petersburg";
+    $zones[3.30*3600] = "GMT+3.30 Tehran,Iran";
+    $zones[4*3600] = "GMT+4 Abu Dhabi,Muscat, Tbilisi, Kazan, Volgograd,Arabia";
+    $zones[4.30*3600] = "GMT+4.30 Kabul,Afghanistan";
+    $zones[5*3600] = "GMT+5 Islamabad,Karachi, Sverdlovsk, Tashkent,West Asia";
+    $zones[5.30*3600] = "GMT+5.30 Bombay, Calcutta, Madras, New Delhi, Colombo,India";
+    $zones[6*3600] = "GMT+6 Alma Ata,Dhaka,Central Asia";
+    $zones[7*3600] = "GMT+7 Bangkok, Jakarta,Hanoi,Bangkok";
+    $zones[8*3600] = "GMT+8 Beijing, Chongqing,Urumqi, Hong Kong, Perth, Singapore";
+    $zones[9*3600] = "GMT+9 Tokyo, Osaka,Sapporo, Seoul, Yakutsk";
+    $zones[9.30*3600] = "GMT+9.30 Adelaide,Central Australia,Darwin";
+    $zones[10*3600] = "GMT+10 Brisbane, Melbourne,Sydney, Guam, Port Moresby, Vladivostok,West Pacific, Hobart";
+    $zones[11*3600] = "GMT+11 Magadan, SolomanIs., New Caledonia,Central Pacific";
+    $zones[12*3600] = "GMT+12 Fiji, Kamchatka,Marshall Is., Wellington, Auckland,New Zealand";
+
+    return $zones;
+}
+

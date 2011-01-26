@@ -1,0 +1,175 @@
+<?php
+function vprefix_menu() {
+
+    $items['weos/prefix'] = array(
+      'description' => 'Incoming Prefix.', 'title' => 'Incoming Prefix',
+      'page callback' => 'vprefix_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+	'type' => MENU_NORMAL_ITEM,
+    );	
+
+    $items['weos/prefix/list'] = array(
+      'description' => 'Incoming Prefix.', 'title' => 'List',
+      'page callback' => 'vprefix_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+    );	
+
+    $items['weos/prefix/edit'] = array(
+      'title' => 'Edit Card',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vprefix_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+    $items['weos/prefix/delete'] = array(
+      'title' => 'Delete bookmarks',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vprefix_lot_delete_confirm'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+    $items['weos/prefix/add'] = array(
+      'title' => 'Add DID',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vprefix_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK);
+
+  return $items;
+}
+
+function vprefix_lot_delete_confirm($form_state = array(),$id = NULL) {
+//    $rate = db_fetch_object(db_query("SELECT * from voip_prefix WHERE prefix = '%d'", $id));
+    $rate = db_fetch_object(db_query("SELECT * from voip_prefix where prefix='%s'",$id));
+//    print_r($rate);
+//    echo $id;
+    //if (!$rate) {
+    //        drupal_goto('weos/prefix');
+    //    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $rate->prefix);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $rate->prefix)), 
+        $_GET['destination'] ? $_GET['destination'] : 'weos/prefix', 
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')  
+        );
+}
+
+function vprefix_lot_delete_confirm_submit($form, &$form_state) {
+//    print_r($form);
+//    die;
+//    echo $form['id'];
+    if ($form_state['values']['confirm']) {
+            db_query("DELETE FROM voip_prefix WHERE prefix = '%s'", $form_state['values']['id']);
+            drupal_goto('weos/prefix');
+        }
+}
+
+
+function vprefix_form_overview() {
+						      
+  if (empty($_SESSION['vprefix_search_filter'])) {
+    $_SESSION['vprefix_search_filter'] = '';
+  }
+
+  $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vprefix_search_filter']
+  );
+			
+  $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//  $form['#redirect'] = FALSE;
+
+  return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vprefix_overview() {
+  $header = array(
+    array('data' => t('prefix'), 'field' => 'prefix'),
+    array('data' => t('Operations'))
+  );
+  $output = drupal_get_form('vprefix_form_overview');
+
+  $tablesort = tablesort_sql($header);
+  $search_str = $_SESSION['vprefix_search_filter'];
+  $sql = "SELECT * from voip_prefix ";
+  if ($search_str != '') {
+    $sql .= "  Where prefix LIKE '$search_str%' ";
+  }else
+    $sql .= " ";
+  
+//echo $sql;
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 50);
+
+
+  while ($rate = db_fetch_object($result)) {
+    $rows[] = 
+      array(
+        // Cells
+        $rate->prefix,
+	array('data' => l('Del','weos/prefix/delete/'.$rate->prefix))
+    );
+  }
+
+  if (!$rows) {
+    $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+  }
+
+  $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 50, 0);
+
+  return $output;
+}
+
+
+function vprefix_form_overview_submit($form, &$form_state) {
+  $_SESSION['vprefix_search_filter'] = $form_state['values']['search'];
+}
+
+
+function vprefix_form($form_state = array(),$id = NULL) {
+ 
+  
+  $form['prefix'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Prefix"),
+    '#default_value' => $id,
+    '#description' => t("The brand of this card lot."),
+    '#maxlength' => 30,
+    '#required' => true,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+
+  return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vprefix_form_submit($form, &$form_state) {
+  global $user;
+    $result = db_query("SELECT prefix from voip_prefix WHERE  prefix='%s' ", $form_state['values']['prefix']);
+    $vuser = db_fetch_object($result);
+    if (!$vuser) {
+       db_query("INSERT into voip_prefix(prefix) Values('%s')", $form_state['values']['prefix']);
+    
+    }else{
+      drupal_set_message("User/prefix  '".$form_state['values'][prefix]."' found.");
+      return drupal_goto('weos/prefix');
+    }
+
+  drupal_goto('weos/prefix/list');
+}
+

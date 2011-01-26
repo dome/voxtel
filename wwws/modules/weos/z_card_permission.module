@@ -1,0 +1,8 @@
+<?php
+function z_card_permission_perm() {
+        return array(
+	    'List card','Add card','Check Card card','Card Lot card',
+        );
+}
+
+?>

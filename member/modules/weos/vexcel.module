@@ -1,0 +1,60 @@
+<?php
+
+function vexcel_menu() {
+  $items = array();
+    $items['excel'] = array(
+      'description' => 'Export.', 'title' => 'Export',
+      'page callback' => 'vexcel_overview',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK);
+      
+  return $items;
+}
+
+function vexcel_overview() {
+$sqlstr = $_SESSION['sqlstr'];
+$filename = $_SESSION['filename'];
+if (! $sqlstr){
+
+print theme('page','Data not found');
+
+}else {
+//module_load_include('hp' ', 'vexcel', '');
+require_once('Spreadsheet/Excel/Writer.php' );
+ob_end_clean();
+$workbook = new Spreadsheet_Excel_Writer();
+$worksheet = & $workbook->addWorksheet("Sheet1");
+$tel_format = & $workbook->addFormat();
+         $result = db_query($sqlstr);
+	 $row = db_fetch_array($result);
+	 $a = array();
+	 $i = 0;
+	 $field = array_keys($row);
+	      foreach($field as $value){
+	        if($value == $key){
+		    $curkey++;
+		    continue;
+		};
+		 //echo $value."\t";
+		 $worksheet->writestring(0,$i, $value);
+		 $i++;
+		 $a[] = $value;
+	      };
+	 $cc = count($a);
+         $result = db_query($sqlstr);
+	 $j = 1;
+	 while ($data = db_fetch_object($result)){
+	   for ($i=0; $i<count($a); $i++) {
+	     $value = @iconv('utf8','tis620',$data->$a[$i]);
+	     $worksheet->writestring($j,$i, $value);
+	    //echo $value."\t";
+	   }
+	    //echo "\n";
+	    $j++;
+	 };
+$workbook->send($filename);
+$workbook->close();
+
+}
+};

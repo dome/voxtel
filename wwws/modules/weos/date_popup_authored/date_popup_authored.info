@@ -1,0 +1,12 @@
+; $Id: date_popup_authored.info,v 1.1 2010/06/13 09:14:43 itafroma Exp $
+name = "Date Popup Authored"
+description = "Provides a datepicker for the 'Authored on' field on node forms."
+core = 6.x
+package = Date/Time
+dependencies[] = date_popup
+; Information added by drupal.org packaging script on 2010-06-13
+version = "6.x-1.0-beta1"
+core = "6.x"
+project = "date_popup_authored"
+datestamp = "1276421104"
+

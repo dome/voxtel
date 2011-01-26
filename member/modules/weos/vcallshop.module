@@ -1,0 +1,395 @@
+<?php
+
+function vcallshop_perm() {
+    return array('access callshop');
+}
+
+function vcallshop_menu() {
+    global $user;
+/*
+  $items['weos'] = array(
+    'title' => 'Billing',
+    'weight' => 0,
+    'page callback' => 'vsystem_overview',
+    'page arguments' => array(),
+    'access callback' => 'user_access',
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+    );
+*/				
+
+    $items['callshop'] = array('title' => 'Callshop',
+      'description' => 'View user.',
+      'page arguments' => array(),
+      'page callback' => 'vcallshop_overview',
+      'weight' => -1,
+      'access arguments' => array('access callshop'),
+    'type' => MENU_NORMAL_ITEM,
+    );
+
+    $items['callshop/list'] = array(
+      'description' => 'View user.', 'title' => 'Sub Account',
+      'page callback' => 'vcallshop_overview',
+      'weight' => -1,
+      'access arguments' => array('access callshop'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+    );
+
+    $items['callshop/cdr'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vcallshop_cdr',
+      'weight' => 5,
+      'access arguments' => array('access callshop'),
+      'type' => MENU_LOCAL_TASK,
+    );
+
+    $items['callshop/add'] = array(
+      'title' => 'Add Sub Account',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vcallshop_form'),
+      'access arguments' => array('access callshop'),
+      'weight' => 0,
+      'type' => MENU_LOCAL_TASK
+    );
+
+    $items['callshop/edit'] = array(
+      'description' => 'View user.', 'title' => 'Edit',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vcallshop_edit_form'),
+      'weight' => 10,
+      'access arguments' => array('access callshop'),
+      'type' => MENU_CALLBACK
+    );
+    $items['callshop/del'] = array(
+      'description' => 'View user.', 'title' => 'Edit',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vcallshop_delete_confirm'),
+      'weight' => 10,
+      'access arguments' => array('access callshop'),
+      'type' => MENU_CALLBACK
+    );
+
+    return $items;
+}
+
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vcallshop_cron() {
+    //  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+    //  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vcallshop_user($op, &$edit, &$user) {
+
+}
+
+function vcallshop_form_overview() {
+
+    if (empty($_SESSION['vcallshop_search_filter'])) {
+        $_SESSION['vcallshop_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 10,
+    '#default_value' => $_SESSION['vcallshop_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+    //  $form['#redirect'] = FALSE;
+
+    return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vcallshop_overview() {
+    global $user;
+    // print_r($user);
+    // get balance
+    $result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+    $udetail = db_fetch_object($result);
+    if (!$udetail) {
+        drupal_set_message("Balance Not found. Please contact Admin ",'error');
+        //return $output;
+        //return drupal_goto('callshop');
+    }else{
+        drupal_set_message("Your Balance :  ".$udetail->balance." ".$udetail->currencysym,'info');
+    }
+    //print l("Add","callshop");
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('vcallshop_form_overview');
+    //username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Password'), 'field' => 'secret'),
+        array('data' => l('Add','callshop/add')),
+        // exp_date
+        //    array('data' => t('Operations'))
+    );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vcallshop_search_filter'];
+    $sql = "SELECT voipusers.redial, voipusers.say_greeting, voipusers.id, concat(voipusers.username::text, voipusers.secret::text) AS number,
+  voipusers.callerid, voipusers.call_forward, voipusers.member_uid, voipusers.username, voipusers.secret, to_number(voipaccount.balance::text, '9999999.99'::text) AS balance, voipaccount.currencysym, voiptariffsel.grpid, voiptariffsel.accountid, voiptariffgrp.description, fdate1(voipusers.create_date) AS create_date, voipusers.email, voipusers.host, voipusers.port, voipusers.allow AS codec
+  , voipusers.card_uid, voipusers.accountcode, voipusers.card_disable, voipaccount.exp_date,voiptariffgrp.description As description , fdate1(voipaccount.exp_date) As exp_date
+     FROM voipusers
+        LEFT JOIN voiptariffsel ON voipusers.accountid = voiptariffsel.accountid
+       LEFT JOIN voipaccount ON voipusers.accountid = voipaccount.id
+          LEFT JOIN voiptariffgrp ON voiptariffsel.grpid = voiptariffgrp.id
+            WHERE voipusers.card_uid = 0 and  voipusers.accountid=$user->vuid";
+    if ($search_str != '') {
+        $sql .= " AND username LIKE '$search_str%' ";
+    }else
+    $sql .= " ";
+
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 20);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->secret,
+            array('data' => l('CDR','callshop/cdr/'.$rate->username)
+                .'  '.l('Edit','callshop/edit/'.$rate->username)
+                .'  '.l('Del','callshop/del/'.$rate->username)
+            ),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 20, 0);
+
+    return $output;
+}
+
+
+function vcallshop_form_overview_submit($form, &$form_state) {
+    $_SESSION['vcallshop_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vcallshop_get_vcallshop_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+function vcallshop_form($form_state,$id = NULL) {
+    global $user;
+    if ($username) {
+        $result = db_query("SELECT * FROM vuser  WHERE username = '%d'", $id);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            return drupal_goto('callshop');
+        }
+    }
+    //check balance
+    $result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+    $udetail = db_fetch_object($result);
+    if (!$udetail) {
+        drupal_set_message("Balance Not found. Please contact Admin ",'error');
+    }else{
+        if ($udetail->balance <= 0){
+            drupal_set_message("Credit not enough.Please Buy Credit Before Add member.",'error');
+            return drupal_goto('callshop/list');
+        };
+    }
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 64,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vcallshop_form_submit($form, &$form_state) {
+    global $user;
+    $result = db_query("SELECT create_account_mobile_callshop('%s',%d);", $form_state['values']['username'],$user->vuid);
+    $card_lot = db_fetch_object($result);
+    if ($card_lot) {
+        if ($card_lot->create_account_mobile_callshop > 0 ) {
+            $_SESSION['vcallshop_search_filter'] = $form_state['values']['username'];
+            drupal_set_message("Successfull Password is   '$card_lot->create_account_mobile_callshop' ");
+        }else {
+            drupal_set_message("Create User ".$form_state['values']['username']." Fail.",'error');
+        };
+    }
+    return drupal_goto('callshop');
+}
+
+function vcallshop_edit_form($form_state,$id = NULL) {
+    global $user;
+    if (!$id) {
+        return drupal_goto('callshop');
+    }
+
+    $sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and accountid=$user->vuid";
+    $result = db_query($sqlstr);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+        drupal_set_message("User ".$id." Not Found.",'error');
+        //return $output;
+        return drupal_goto('callshop');
+    };
+
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 255,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Password"),
+    '#default_value' => $card_lot->secret,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+function vcallshop_delete_confirm($form_state,$id = NULL) {
+    global $user;
+    $sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and accountid=$user->vuid";
+    $card_lot = db_fetch_object(db_query($sqlstr));
+
+    if (!$card_lot) {
+        drupal_goto('callshop');
+    }
+    if ($card_lot->username == $user->name) {
+        drupal_set_message("Can't delete main account ",'error');
+        drupal_goto('callshop');
+    }
+
+    $form['id'] = array('#type' => 'value', '#value' => $card_lot->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $card_lot->username)),
+        $_GET['destination'] ? $_GET['destination'] : 'callshop',
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')
+    );
+}
+
+function vcallshop_delete_confirm_submit($form, &$form_state) {
+    if ($form_state['values']['confirm']) {
+        db_query("DELETE FROM voipusers WHERE id= %d", $form_state['values']['id']);
+        drupal_goto('callshop');
+    }
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vcallshop_edit_form_submit($form, &$form_state) {
+    $result = db_query("update voipusers set secret = '%s' where username = '%s';", $form_state['values']['secret'],$form_state['values']['username']);
+    //   $result = db_query("update dr_users set plainpass = '%s',pass=MD5('%s') where name = '%s';", $form_state['values']['secret'],
+    //       $form_state['values']['secret'],$form_state['values']['username']);
+    $card_lot = db_fetch_object($result);
+    return drupal_goto('callshop');
+}
+
+
+function vcallshop_cdr($username = NULL) {
+    global $user;
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    if (strlen($username)==0)
+    $username = $user->name;
+
+    $udetail = array();
+    $result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+    $udetail = db_fetch_object($result);
+    $output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currencysym;
+    $output .= '<br><br><b>Payment:</b><br>';
+
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+        array('data' => t('Number'), 'field' => 'calledstationid'),
+        array('data' => t('Destination'), 'field' => 'tariffdesc'),
+        array('data' => t('WiFi Node'), 'field' => 'node_acct'),
+        array('data' => t('Rate'), 'field' => 'price'),
+        array('data' => t('Duration'), 'field' => 'duration'),
+        array('data' => t('Total'), 'field' => 'cost'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+    );
+    $sql = " SELECT username,acctstarttime,calledstationid,tariffdesc,price,duration,node_acct,
+  cost,currencysym from voipcall Where username != '$username' and accountid=$user->vuid ";
+
+    $tablesort = tablesort_sql($header);
+    $sql_count = "Select count(username) from voipcall Where username != '$username' and accountid=$user->vuid ";
+    $result = pager_query($sql . $tablesort, 10,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->acctstarttime,
+            $rate->calledstationid,
+            $rate->tariffdesc,
+            l($rate->node_acct,"wifi/node/view/".$rate->node_acct),
+            $rate->price,
+            $rate->duration,
+            $rate->cost,
+            $rate->currencysym,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 10, 0);
+    return $output;
+}
+

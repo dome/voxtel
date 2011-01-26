@@ -1,0 +1,695 @@
+<?php
+
+
+function vwholesale_perm() {
+	return array('access wholesale');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function vwholesale_menu() {
+	global $user;
+	$items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+   
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+   
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+   
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+
+		// vwholesale_rate_overview
+		$items['wholesale/rate'] = array(
+      'description' => 'View Rate.', 'title' => 'Rate',
+      'page callback' => 'vwholesale_rate_overview',
+      'weight' => -1,
+      'access arguments' => array('access wholesale'),
+	'type' => MENU_NORMAL_ITEM,
+		);
+
+
+		$items['wholesale'] = array(
+      'description' => 'Gateway List.', 'title' => 'Wholesale',
+      'page callback' => 'vwholesale_overview',
+      'weight' => -1,
+      'access arguments' => array('access wholesale'),
+	'type' => MENU_NORMAL_ITEM,
+		);
+
+		$items['wholesale/list'] = array(
+      'description' => 'Gateway List.', 'title' => 'Gateway',
+      'page callback' => 'vwholesale_overview',
+      'weight' => -1,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+		);
+
+		$items['wholesale/payment/'.$user->name] = array(
+      'description' => 'Payment.', 'title' => 'Payment',
+      'page callback' => 'vwholesale_detail',
+      'weight' => 1,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_LOCAL_TASK,
+		);
+
+		$items['wholesale/cdr'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vwholesale_cdr',
+      'weight' => 5,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_LOCAL_TASK,
+		);
+
+		$items['wholesale/topupmyaccount'] = array(
+      'description' => 'TopUp.', 'title' => 'TopUP to My Account',
+      'page callback' => 'vwholesale_topup_myaccount',
+      'weight' => 2,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_LOCAL_TASK
+		);
+
+
+		$items['wholesale/detail'] = array(
+      'description' => 'View user detail.', 'title' => 'Detail',
+      'page callback' => 'vwholesale_detail',
+      'weight' => 1,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_CALLBACK
+		);
+
+		$items['wholesale/add'] = array(
+      'title' => 'Add Gateway',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vwholesale_form'),
+      'access arguments' => array('access wholesale'),
+      'weight' => 0,
+      'type' => MENU_LOCAL_TASK
+		);
+		$items['wholesale/edit'] = array(
+      'description' => 'View user.', 'title' => 'Edit',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vwholesale_form'),
+      'weight' => 10,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_CALLBACK
+		);
+		$items['wholesale/delete'] = array(
+      'description' => 'View user.', 'title' => 'Delete',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vwholesale_delete_confirm'),
+      'weight' => 10,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_CALLBACK
+		);
+		$items['wholesale/topup'] = array(
+      'description' => 'View user.', 'title' => 'Topup',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vwholesale_topup_form'),
+      'weight' => 10,
+      'access arguments' => array('access wholesale'),
+      'type' => MENU_CALLBACK
+		);
+
+	return $items;
+}
+
+function vwholesale_user($op, &$edit, &$user) {
+
+}
+
+function vwholesale_form_overview() {
+
+	if (empty($_SESSION['vwholesale_search_filter'])) {
+		$_SESSION['vwholesale_search_filter'] = '';
+	}
+
+	$form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 10,
+    '#default_value' => $_SESSION['vwholesale_search_filter']
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vwholesale_overview() {
+	global $user;
+	$result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+	$udetail = db_fetch_object($result);
+	if (!$udetail) {
+		drupal_set_message("Balance Not found. Please contact Admin ",'error');
+	}else{
+		drupal_set_message("Your Balance :  ".$udetail->balance." ".$udetail->currencysym,'info');
+	}
+	$icons = array(WATCHDOG_NOTICE  => '',
+	WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+	WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+	$classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+	$output = drupal_get_form('vwholesale_form_overview');
+	$header = array(
+	array('data' => t('Gw'), 'field' => 'name'),
+	array('data' => t('Allow IP'), 'field' => 'permit'),
+	//array('data' => t('Net Mask'), 'field' => 'permit_mask'),
+	array('data' => l('Add','wholesale/add')),
+	// exp_date
+	//    array('data' => t('Operations'))
+	);
+
+	$tablesort = tablesort_sql($header);
+	$search_str = $_SESSION['vwholesale_search_filter'];
+	$sql = "SELECT id,voipusers.name , voipusers.permit, voipusers.permit_mask
+     FROM voipusers  WHERE voipusers.card_uid = 0 and char_length(voipusers.permit) > 0 and voipusers.accountid = $user->vuid";
+	if ($search_str != '') {
+		$sql .= " AND username LIKE '$search_str%' ";
+	}else
+	$sql .= " ";
+
+	//echo $sql;
+	$result = pager_query($sql . $tablesort, 20);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] = 
+		array(
+		// Cells
+		$rate->name,
+		$rate->permit,
+		//$rate->permit_mask,
+		array('data' => l('CDR','wholesale/cdr/'.$rate->name)),
+		array('data' => l('Edit','wholesale/edit/'.$rate->name)),
+		array('data' => l('Delete','wholesale/delete/'.$rate->id)),
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 20, 0);
+
+	return $output;
+}
+
+
+function vwholesale_form_overview_submit($form, &$form_state) {
+	$_SESSION['vwholesale_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vwholesale_get_vwholesale_group() {
+	$types = array();
+
+	$result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+	while ($object = db_fetch_object($result)) {
+		$types[] = array($object->id => $object->description);
+	}
+
+	return $types;
+}
+
+function vwholesale_form($id = NULL) {
+	global $user;
+	if ($id) {
+		$sqlstr = "SELECT * FROM voipusers  WHERE name = '$id' and accountid=$user->vuid";
+		$result = db_query($sqlstr);
+		$card_lot = db_fetch_object($result);
+		$form['id'] = array(
+                '#type' => 'value',
+                '#value' => $card_lot->id,
+		);
+
+		if (!$card_lot) {
+			drupal_set_message("User ".$id." Not Found.",'error');
+			//return $output;
+			return drupal_goto('wholesale');
+		};
+	};
+
+	$form['ipallow'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Allow IP"),
+    '#description' => t('Enter the IP and Netmask Your Gateway<br> Example 203.149.32.1/24'),
+    '#default_value' => $card_lot->permit,
+    '#maxlength' => 100,
+    '#required' => true,
+	);
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+	);
+
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vwholesale_form_submit($form, &$form_state) {
+	global $user;
+	list($ip,$mask)=split("/", $form['ipallow'], 2);
+	if ($form['id']) {
+		$result = db_query("update voipusers set permit = '%s',name='%s' where id = %d;", $form['ipallow'],$ip,$form['id']);
+		$card_lot = db_fetch_object($result);
+
+	}else{
+		$result = db_query("SELECT create_gateway('%s','%s','%s') As addgw;",$user->name,$ip,$form['ipallow']);
+		$card_lot = db_fetch_object($result);
+		if ($card_lot) {
+			if ($card_lot->addgw == 0 ) {
+				drupal_set_message("Successfull. ");
+			}else {
+				drupal_set_message("Add Gateway ".$form['ipallow']." Fail.",'error');
+			};
+		}
+	}
+	return drupal_goto('wholesale');
+}
+function vwholesale_delete_confirm($id = NULL) {
+	global $user;
+	//SELECT * FROM voipusers  WHERE name = '$id' and accountid=$user->vuid
+    $gw = db_fetch_object(db_query("SELECT * from voipusers WHERE id = %d and accountid=%d ;", $id,$user->vuid));
+
+    if (!$gw) {
+            drupal_goto('wholesale');
+        }
+
+    $form['id'] = array('#type' => 'value', '#value' => $gw->id);
+    return confirm_form($form,
+        t('Are you sure you want to delete %brand?', array('%brand' => $gw->name)), 
+        $_GET['destination'] ? $_GET['destination'] : 'weos/wholesale', 
+        t('This action cannot be undone.'),
+        t('Delete'), t('Cancel')  
+        );
+}
+
+function vwholesale_delete_confirm_submit($form, &$form_state) {
+	global $user;
+    if ($form['confirm']) {
+            db_query("DELETE from voipusers WHERE id = %d and accountid=%d ;", $form['id'],$user->vuid);
+            drupal_goto('wholesale');
+        }
+}
+
+
+function vwholesale_topup_form($id = NULL) {
+	global $user;
+	if (!$id) {
+		return drupal_goto('wholesale');
+	}
+
+	$sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and owner='$user->name'";
+	$result = db_query($sqlstr);
+	$card_lot = db_fetch_object($result);
+	if (!$card_lot) {
+		drupal_set_message("User ".$id." Not Found.",'error');
+		//return $output;
+		return drupal_goto('wholesale');
+	};
+
+	$result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+	$udetail = db_fetch_object($result);
+	if (!$udetail) {
+		drupal_set_message("Balance Not found. Please contact Admin ",'error');
+		//return $output;
+		//return drupal_goto('wholesale');
+	}else{
+		drupal_set_message("Your Balance :".$udetail->balance." ".$udetail->currencysym,'info');
+	}
+
+	$form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 255,
+    '#required' => false,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$form['balance'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Balance"),
+    '#default_value' => $card_lot->balance,
+    '#required' => false,
+    '#attributes' => array('readonly' => 'readonly'),
+	);
+
+	$form['pin'] = array(
+    '#type' => 'textfield',
+    '#title' => t("TopUP From PIN"),
+    '#default_value' => '',
+    '#required' => false,
+	);
+
+
+	$form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'TopUp',
+	);
+
+
+	$form['tpay'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Transfer From Balance"),
+    '#default_value' => '',
+    '#required' => false,
+	);
+
+	$form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Transfer',
+	);
+
+	return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vwholesale_topup_form_submit($form, &$form_state) {
+	global $user;
+	if ((strlen($form['username']) > 0) AND (strlen($form['pin']) > 0) ){
+		$result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form['pin'],$form['username']);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+			return drupal_goto('wholesale');
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("TopUp From ".$form['pin']." Success.");
+				return drupal_goto('wholesale/detail/'.$form['username']);
+			}else{
+				drupal_set_message("TopUp From ".$form['pin']." Fail.",'error');
+				return drupal_goto('wholesale');
+			};
+		};
+	};
+	$result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+	$udetail = db_fetch_object($result);
+	if (!$udetail) {
+		drupal_set_message("Balance Not found. Please contact Admin ",'error');
+		return drupal_goto('wholesale');
+	}
+
+	if ((strlen($form['username']) > 0) AND (strlen($form['tpay']) > 0) )
+	if($udetail->balance > $form['tpay']){
+		$result = db_query("SELECT i_pay('%s','%s',%d,1) As cpay ;", $user->name,$form['username'],$form['tpay']);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("Transfer ".$form['tpay']." Fail.",'error');
+			return drupal_goto('wholesale');
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("Transfer ".$form['tpay']." Success.");
+				return drupal_goto('wholesale/detail/'.$form['username']);
+			}else{
+				drupal_set_message("Transfer ".$form['tpay']." Fail.",'error');
+				return drupal_goto('reseller');
+			};
+		};
+	};
+
+	drupal_set_message(" Fail.",'error');
+	return drupal_goto('wholesale/detail/'.$form['username']);
+}
+
+function vwholesale_topup_myaccount_form() {
+
+	if (empty($_SESSION['vwholesale_search_filter'])) {
+		$_SESSION['vwholesale_search_filter'] = '';
+	}
+
+	$form['tpin'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Top UP From PIN',
+    '#size' => 50,
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Top UP'));
+//	$form['#redirect'] = FALSE;
+	return $form;
+}
+
+function vwholesale_topup_myaccount_form_submit($form, &$form_state) {
+	global $user;
+	if (strlen($form['tpin']) > 0) {
+		$result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form['tpin'],$user->name);
+		$card_lot = db_fetch_object($result);
+		if (!$card_lot) {
+			drupal_set_message("TopUp From ".$form['tpin']." Fail.",'error');
+			return drupal_goto('wholesale');
+		}else{
+			if ($card_lot->cpay > 0) {
+				drupal_set_message("TopUp From ".$form['tpin']." Success.");
+				return drupal_goto('wholesale/detail/'.$form['username']);
+			}else{
+				drupal_set_message("TopUp From ".$form['tpin']." Fail.",'error');
+				return drupal_goto('wholesale');
+			};
+		};
+	};
+
+	drupal_set_message(" Fail.",'error');
+	return drupal_goto('wholesale/detail/'.$form['username']);
+}
+
+
+function vwholesale_rate_form_overview() {
+
+	if (empty($_SESSION['vwholesale_overview_filter'])) {
+		$_SESSION['vwholesale_overview_filter'] = '0';
+	}
+	if (empty($_SESSION['vwholesale_search_filter'])) {
+		$_SESSION['vwholesale_search_filter'] = '';
+	}
+
+	$form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vwholesale_search_filter']
+	);
+
+	$form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//	$form['#redirect'] = FALSE;
+
+	return $form;
+}
+
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vwholesale_rate_overview() {
+	global $user;
+	$icons = array(WATCHDOG_NOTICE  => '',
+	WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+	WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+	$classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+	$result = db_query('SELECT  DISTINCT(description),grpid As id FROM user_rate_group Where accountid=%d',$user->vuid);
+	$object = db_fetch_object($result);
+	echo $object->id;
+	$type=$object->id;
+
+	$output = drupal_get_form('vwholesale_rate_form_overview');
+
+	$header = array(
+	array('data' => t('Destination'), 'field' => 'description'),
+	array('data' => t('Prefix'), 'field' => 'prefix'),
+	array('data' => t('Price'), 'field' => 'price'),
+	array('data' => t('Currency'), 'field' => 'currencysym'),
+	array('data' => t('Group'), 'field' => 'group_dsc'),
+	);
+
+	$tablesort = tablesort_sql($header);
+	$type = $_SESSION['vwholesale_overview_filter'];
+	$search_str = $_SESSION['vwholesale_search_filter'];
+	/*
+	 SELECT voiptariff.id, voiptariffdst.prefix, voiptariffdst.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+	 FROM voiptariff
+	 LEFT JOIN voiptariffdst ON voiptariff.dstid = voiptariffdst.id
+	 LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id;
+	 */
+	$sql = "
+   SELECT voiptariff.id, voiptariff.prefix, voiptariff.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+   FROM voiptariff
+         LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id  
+  ";
+	$sql_count = "select count(id) from voiptariff";
+	if ($type != '0') {
+		$sql .= " WHERE grpid = $object->id ";
+		$sql_count .= " WHERE grpid = $object->id ";
+	}else{
+		$sql .= " WHERE 0=0 ";
+		$sql_count .= " WHERE 0=0 ";
+
+	}
+	if ($search_str != '') {
+		$sql .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+		$sql_count .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%'";
+	};
+	//echo $sql;
+	$result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->description,
+		$rate->prefix,
+		$rate->price,
+		$rate->currencysym,
+		$rate->group_dsc,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 50, 0);
+
+	return $output;
+}
+
+function vwholesale_rate_form_overview_submit($form, &$form_state) {
+	$_SESSION['vwholesale_overview_filter'] = $form_state['values']['filter'];
+	$_SESSION['vwholesale_search_filter'] = $form_state['values']['search'];
+}
+
+function vwholesale_detail($username = NULL) {
+	global $user;
+	$icons = array(WATCHDOG_NOTICE  => '',
+	WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+	WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+	$classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+	$udetail = array();
+	if (strlen($username)==0)
+	$username = $user->name;
+	$result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+	$udetail = db_fetch_object($result);
+	$output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currencysym;
+	$output .= '<br><br><b>Payment:</b><br>';
+
+	$header = array(
+	array('data' => t('Username'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'date','sort'=>'desc'),
+	array('data' => t('Amount'), 'field' => 'paid'),
+	array('data' => t('Ref'), 'field' => 'ref'),
+	);
+
+	$sql = "   SELECT * from vpayment where username='$username'   ";
+	$sql_count = "select count(username) from vpayment where username='$username'";
+
+	$tablesort = tablesort_sql($header);
+	$result = pager_query($sql . $tablesort, 10,0,$sql_count);
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->username,
+		$rate->date,
+		$rate->paid,
+		$rate->ref,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 10, 0);
+
+	return $output;
+}
+
+function vwholesale_cdr($username = NULL) {
+	global $user;
+	$icons = array(WATCHDOG_NOTICE  => '',
+	WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+	WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+	$classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+	if (strlen($username)==0)
+	$username = $user->name;
+
+	$udetail = array();
+	$result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+	$udetail = db_fetch_object($result);
+	$output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currencysym;
+	$output .= '<br><br><b>Payment:</b><br>';
+
+	$header = array(
+	array('data' => t('Username'), 'field' => 'username'),
+	array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+	array('data' => t('Number'), 'field' => 'calledstationid'),
+	array('data' => t('Destination'), 'field' => 'tariffdesc'),
+	array('data' => t('Rate'), 'field' => 'price'),
+	array('data' => t('Duration'), 'field' => 'duration'),
+	array('data' => t('Total'), 'field' => 'cost'),
+	array('data' => t('Currency'), 'field' => 'currencysym'),
+	);
+	$sql = " SELECT username,acctstarttime,calledstationid,tariffdesc,price,duration,
+  cost,currencysym from voipcall Where username = '$username' ";
+
+	$tablesort = tablesort_sql($header);
+	$sql_count = "Select count(username) from voipcall Where username = '$username'";
+	$result = pager_query($sql . $tablesort, 10,0,$sql_count);
+
+	while ($rate = db_fetch_object($result)) {
+		$rows[] =
+		array(
+		// Cells
+		$rate->username,
+		$rate->acctstarttime,
+		$rate->calledstationid,
+		$rate->tariffdesc,
+		$rate->price,
+		$rate->duration,
+		$rate->cost,
+		$rate->currencysym,
+		);
+	}
+
+	if (!$rows) {
+		$rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+	}
+
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, 10, 0);
+	return $output;
+}
+
+function vwholesale_topup_myaccount() {
+	//  print l("hello dome",'?node/2');
+	//http://221.128.124.203/callsbuy/admin/cart/add/destination=node/3
+	$output = l('<img src="https://www.paypal.com/en_US/i/btn/x-click-butcc.gif">', "paypal", array('absolute' => TRUE, 'html' => TRUE));
+	$output .= drupal_get_form('vwholesale_topup_myaccount_form');
+	return $output;
+}
+

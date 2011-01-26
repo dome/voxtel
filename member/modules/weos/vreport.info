@@ -1,0 +1,8 @@
+name = Weos Report Module
+description = A weos Report module
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

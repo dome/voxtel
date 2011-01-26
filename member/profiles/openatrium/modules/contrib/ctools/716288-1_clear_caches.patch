@@ -1,0 +1,50 @@
+Index: includes/export.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/ctools/includes/export.inc,v
+retrieving revision 1.19.2.7
+diff -u -p -r1.19.2.7 export.inc
+--- includes/export.inc	29 Jan 2010 23:42:12 -0000	1.19.2.7
++++ includes/export.inc	16 Feb 2010 21:29:26 -0000
+@@ -193,12 +193,17 @@ function ctools_export_load_object_reset
+   if (empty($table)) {
+     ctools_static_reset('ctools_export_load_object');
+     ctools_static_reset('ctools_export_load_object_all');
++    ctools_static_reset('_ctools_export_get_defaults');
++    ctools_static_reset('ctools_plugin_api_info');
+   }
+   else {
+     $cache = &ctools_static('ctools_export_load_object');
+     $cached_database = &ctools_static('ctools_export_load_object_all');
++    $cached_defaults = &ctools_static('_ctools_export_get_defaults');
+     unset($cache[$table]);
+     unset($cached_database[$table]);
++    unset($cached_defaults[$table]);
++    ctools_static_reset('ctools_plugin_api_info');
+   }
+ }
+ 
+@@ -247,7 +252,7 @@ function ctools_get_default_object($tabl
+  * to get default objects.
+  */
+ function _ctools_export_get_defaults($table, $export) {
+-  static $cache = array();
++  $cache = &ctools_static(__FUNCTION__, array());
+ 
+   if (!isset($cache[$table])) {
+     $cache[$table] = array();
+Index: includes/plugins.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/ctools/includes/plugins.inc,v
+retrieving revision 1.18.2.5
+diff -u -p -r1.18.2.5 plugins.inc
+--- includes/plugins.inc	16 Jan 2010 00:07:34 -0000	1.18.2.5
++++ includes/plugins.inc	16 Feb 2010 21:29:27 -0000
+@@ -56,7 +56,7 @@
+  *   need. This should be in the documentation for that particular API.
+  */
+ function ctools_plugin_api_info($owner, $api, $minimum_version, $current_version) {
+-  static $cache = array();
++  $cache = &ctools_static(__FUNCTION__, array());
+   if (!isset($cache[$owner][$api])) {
+     $cache[$owner][$api] = array();
+     foreach (module_implements('ctools_plugin_api') as $module) {

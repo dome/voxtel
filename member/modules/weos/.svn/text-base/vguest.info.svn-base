@@ -1,0 +1,8 @@
+name = Weos Guest Support Module
+description = A weos Guest Support
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

@@ -1,0 +1,84 @@
+? og_views_managelink_groupcontext.patch
+? modules/og_views/includes/.og_views_handler_field_og_managelinkadmin.inc.swp
+Index: modules/og_views/includes/og_views_handler_field_og_is_admin.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/og/modules/og_views/includes/Attic/og_views_handler_field_og_is_admin.inc,v
+retrieving revision 1.2
+diff -u -r1.2 og_views_handler_field_og_is_admin.inc
+--- modules/og_views/includes/og_views_handler_field_og_is_admin.inc	29 Oct 2008 20:00:52 -0000	1.2
++++ modules/og_views/includes/og_views_handler_field_og_is_admin.inc	23 Feb 2010 15:55:06 -0000
+@@ -6,10 +6,14 @@
+  */
+ class og_views_handler_field_og_is_admin extends views_handler_field {
+   function render($values) {
+-     $is_admin = $values->{$this->field_alias};
++    $is_admin = $values->{$this->field_alias};
++    $group = og_get_group_context();
++    // Check that the queried admin nid matches the current group context 
++    // -- outside a group context we can get unpredictable results for the nid 
++    // in this entry.
+     // don't use og_is_group_admin() here since we don't want mark on 'admin nodes' people.
+-    if ($is_admin) {
++    if ($group && ($group->nid === $is_admin)) {
+       return t('admin'); 
+     }
+   }
+-}
+\ No newline at end of file
++}
+Index: modules/og_views/includes/og_views_handler_field_og_managelink.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/og/modules/og_views/includes/Attic/og_views_handler_field_og_managelink.inc,v
+retrieving revision 1.3
+diff -u -r1.3 og_views_handler_field_og_managelink.inc
+--- modules/og_views/includes/og_views_handler_field_og_managelink.inc	19 Dec 2008 18:51:31 -0000	1.3
++++ modules/og_views/includes/og_views_handler_field_og_managelink.inc	23 Feb 2010 15:55:06 -0000
+@@ -22,8 +22,12 @@
+     $uid = $values->{$this->aliases['uid']};
+     $is_active = $values->{$this->aliases['is_active']};
+     $node = node_load($nid);
++    $group = og_get_group_context();
++    // Check that the queried membership entry nid matches the current group
++    // context -- outside a group context we can get unpredictable results for
++    // the nid in this entry.
+     // Only show links to group admins. And don't show next to group manager.
+-    if ($uid != $node->uid) {
++    if ($group && ($group->nid === $node->nid) && ($uid != $node->uid)) {
+       if ($is_active) {
+         $item = menu_get_item("og/unsubscribe/$nid/$uid");
+         if ($item['access']) {
+@@ -39,4 +43,4 @@
+       }
+     }
+   }
+-}
+\ No newline at end of file
++}
+Index: modules/og_views/includes/og_views_handler_field_og_managelinkadmin.inc
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/og/modules/og_views/includes/Attic/og_views_handler_field_og_managelinkadmin.inc,v
+retrieving revision 1.3
+diff -u -r1.3 og_views_handler_field_og_managelinkadmin.inc
+--- modules/og_views/includes/og_views_handler_field_og_managelinkadmin.inc	19 Dec 2008 18:51:31 -0000	1.3
++++ modules/og_views/includes/og_views_handler_field_og_managelinkadmin.inc	23 Feb 2010 15:55:06 -0000
+@@ -22,8 +22,12 @@
+     $uid = $values->{$this->aliases['uid']};
+     $is_admin = $values->{$this->aliases['is_admin']};
+     $node = node_load($nid);
++    $group = og_get_group_context();
++    // Check that the queried admin entry nid matches the current group
++    // context -- outside a group context we can get unpredictable results for
++    // the nid in this entry.
+     // Only show links to group admins. And don't show next to group manager.
+-    if ($uid != $node->uid) {
++    if ($group && ($group->nid === $node->nid) && ($uid != $node->uid)) {
+       if ($is_admin) {
+         $item = menu_get_item("og/delete_admin/$nid/$uid");
+         if ($item['access']) {
+@@ -38,4 +42,4 @@
+       }
+     }
+   }
+-}
+\ No newline at end of file
++}

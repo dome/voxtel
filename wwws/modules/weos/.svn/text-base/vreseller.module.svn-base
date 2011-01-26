@@ -1,0 +1,832 @@
+<?php
+
+function vreseller_perm() {
+    return array('access reseller');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function vreseller_menu() {
+    global $user;
+//    $items = array();
+
+/* TODO
+   Non menu code that was placed in hook_menu under the '!$may_cache' block
+   so that it could be run during initialization, should now be moved to hook_init.
+   Previously we called hook_init twice, once early in the bootstrap process, second
+   just after the bootstrap has finished. The first instance is now called boot
+   instead of init.
+   
+   In Drupal 6, there are now two hooks that can be used by modules to execute code
+   at the beginning of a page request. hook_boot() replaces hook_boot() in Drupal 5
+   and runs on each page request, even for cached pages. hook_boot() now only runs
+   for non-cached pages and thus can be used for code that was previously placed in
+   hook_menu() with $may_cache = FALSE:
+   
+   Dynamic menu items under a '!$may_cache' block can often be simplified
+   to remove references to arg(n) and use of '%<function-name>' to check
+   conditions. See http://drupal.org/node/103114.
+   
+   The title and description arguments should not have strings wrapped in t(),
+   because translation of these happen in a later stage in the menu system.
+*/
+
+        // vreseller_rate_overview
+        $items['reseller/rate'] = array(
+      'description' => 'View Rate.', 'title' => 'Rate',
+      'page callback' => 'vreseller_rate_overview',
+      'weight' => -1,
+      'access arguments' => array('access reseller'),
+        'type' => MENU_NORMAL_ITEM,
+        );
+
+
+        $items['reseller'] = array(
+      'description' => 'View user.', 'title' => 'Reseller',
+      'page callback' => 'vreseller_overview',
+      'weight' => -1,
+      'access arguments' => array('access reseller'),
+        'type' => MENU_NORMAL_ITEM,
+        );
+
+        $items['reseller/list'] = array(
+      'description' => 'View user.', 'title' => 'Member',
+      'page callback' => 'vreseller_overview',
+      'weight' => -1,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+        );
+
+        $items['reseller/payment/'.$user->name] = array(
+      'description' => 'Payment.', 'title' => 'Payment',
+      'page callback' => 'vreseller_detail',
+      'weight' => 1,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_LOCAL_TASK,
+        );
+
+        $items['reseller/cdr'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vreseller_cdr',
+      'weight' => 5,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_LOCAL_TASK,
+        );
+
+        $items['reseller/topupmyaccount'] = array(
+      'description' => 'TopUp.', 'title' => 'TopUP to My Account',
+      'page callback' => 'vreseller_topup_myaccount',
+      'weight' => 2,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_LOCAL_TASK
+        );
+
+
+        $items['reseller/detail'] = array(
+      'description' => 'View user detail.', 'title' => 'Detail',
+      'page callback' => 'vreseller_detail',
+      'weight' => 1,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_CALLBACK
+        );
+
+        $items['reseller/add'] = array(
+      'title' => 'New Member',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vreseller_form'),
+      'access arguments' => array('access reseller'),
+      'weight' => 0,
+      'type' => MENU_LOCAL_TASK
+        );
+        $items['reseller/edit'] = array(
+      'description' => 'View user.', 'title' => 'Edit',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vreseller_edit_form'),
+      'weight' => 10,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_CALLBACK
+        );
+        $items['reseller/topup'] = array(
+      'description' => 'View user.', 'title' => 'Topup',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vreseller_topup_form'),
+      'weight' => 10,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_LOCAL_TASK
+        );
+
+        $items['reseller/service_charge'] = array(
+      'description' => 'Service Charge.', 'title' => 'Service Charge',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vreseller_service_charge_form'),
+      'weight' => 10,
+      'access arguments' => array('access reseller'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => 10,
+        );
+
+    return $items;
+}
+
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vreseller_cron() {
+    //  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+    //  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+function vreseller_service_charge_form() {
+    global $user;
+
+    $result = db_query("SELECT d_service_charge from voipusers where username='%s';", $user->name);
+    $data = db_fetch_object($result);
+
+    $form['service_charge'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Service Charge (%)"),
+    '#default_value' => $data->d_service_charge,
+    '#maxlength' => 6,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+function vreseller_service_charge_form_submit($form, &$form_state) {
+    global $user;
+    if ($form['service_charge'] > 0) {
+    $result = db_query("UPDATE voipusers set d_service_charge=%d where username='%s';", $form['service_charge'],$user->name);
+    $result = db_query("UPDATE voipusers set service_charge=%d where owner='%s';", $form['service_charge'],$user->name);
+    $result = db_query("UPDATE dr_users set service_charge = %d where name in (select username from voipusers where owner='%s')",$form['service_charge'],$user->name);
+    }else {
+            drupal_set_message("Service Charge > 0 ",'error');
+        };
+    $form_state['redirect'] = drupal_goto('reseller');
+};
+
+
+function vreseller_form_overview() {
+
+    if (empty($_SESSION['vreseller_search_filter'])) {
+        $_SESSION['vreseller_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 10,
+    '#default_value' => $_SESSION['vreseller_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vreseller_overview() {
+    global $user;
+    // print_r($user);
+    // get balance
+    $result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+    $udetail = db_fetch_object($result);
+    if (!$udetail) {
+        drupal_set_message("Balance Not found. Please contact Admin ",'error');
+        //return $output;
+        //return drupal_goto('reseller');
+    }else{
+        drupal_set_message("Your Balance :  ".$udetail->balance." ".$udetail->currencysym,'info');
+    }
+    //print l("Add","reseller");
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $output = drupal_get_form('vreseller_form_overview');
+    //username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Password'), 'field' => 'secret'),
+        array('data' => t('Balance'), 'field' => 'balance'),
+        array('data' => t('Rate'), 'field' => 'description'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+        array('data' => t('Create'), 'field' => 'create_date'),
+        array('data' => t('Expire Date'), 'field' => 'exp_date'),
+        array('data' => l('Add','reseller/add')),
+        // exp_date
+        //    array('data' => t('Operations'))
+    );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vreseller_search_filter'];
+    $sql = "SELECT voipusers.redial, voipusers.say_greeting, voipusers.id, concat(voipusers.username::text, voipusers.secret::text) AS number,
+  voipusers.callerid, voipusers.call_forward, voipusers.member_uid, voipusers.username, voipusers.secret, to_number(voipaccount.balance::text, '9999999.99'::text) AS balance, voipaccount.currencysym, voiptariffsel.grpid, voiptariffsel.accountid, voiptariffgrp.description, fdate1(voipusers.create_date) AS create_date, voipusers.email, voipusers.host, voipusers.port, voipusers.allow AS codec
+  , voipusers.card_uid, voipusers.accountcode, voipusers.card_disable, voipaccount.exp_date,voiptariffgrp.description As description , fdate1(voipaccount.exp_date) As exp_date
+     FROM voipusers
+        LEFT JOIN voiptariffsel ON voipusers.accountid = voiptariffsel.accountid
+           LEFT JOIN voipaccount ON voipusers.accountid = voipaccount.id
+              LEFT JOIN voiptariffgrp ON voiptariffsel.grpid = voiptariffgrp.id
+                WHERE voipusers.card_uid = 0 and voipusers.owner = '$user->name'";
+    if ($search_str != '') {
+        $sql .= " AND username LIKE '$search_str%' ";
+    }else
+    $sql .= " ";
+
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 20);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->secret,
+            $rate->balance,
+            $rate->description,
+            $rate->currencysym,
+            $rate->create_date,
+            $rate->exp_date,
+            array('data' => l('CDR','reseller/cdr/'.$rate->username)),
+            array('data' => l('Payment','reseller/detail/'.$rate->username)),
+            array('data' => l('Edit','reseller/edit/'.$rate->username)),
+            array('data' => l('Top Up','reseller/topup/'.$rate->username)),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 20, 0);
+
+    return $output;
+}
+
+
+function vreseller_form_overview_submit($form, &$form_state) {
+    $_SESSION['vreseller_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vreseller_get_vreseller_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+function vreseller_form($form_state,$id = NULL) {
+    global $user,$rminimum;
+//        drupal_set_message("Balance :".$user->balance,'error');
+    if ($username) {
+        $result = db_query("SELECT * FROM vuser  WHERE username = '%d'", $id);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            return drupal_goto('reseller');
+        }
+    }
+    if ($user->balance <= 0) {
+            drupal_set_message("Credit not enough.Please Buy Credit Before Add member.",'error');
+            return drupal_goto('reseller/member');
+    }
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 64,
+    '#required' => true,
+    );
+
+    $form['credit'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Credit"),
+    '#default_value' => $rminimum,
+    '#maxlength' => 20,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vreseller_form_submit($form, &$form_state) {
+    global $user,$rminimum;
+
+if ($form_state['values']['credit'] < $rminimum) {
+            drupal_set_message("Minimum Credit ".$rminimum,'error');
+            return drupal_goto('reseller/member');
+    };
+
+    if ($user->balance < $form_state['values']['credit']) {
+            drupal_set_message("Credit not enough.Please Buy Credit Before Add member.",'error');
+            return drupal_goto('reseller/member');
+    };
+
+    $result = db_query("SELECT create_account_mobile_reseller('%s','%s');", $form_state['values']['username'],$user->name);
+    $card_lot = db_fetch_object($result);
+    if ($card_lot) {
+        if ($card_lot->create_account_mobile_reseller > 0 ) {
+            $_SESSION['vreseller_search_filter'] = $form_state['values']['username'];
+            drupal_set_message("Successfull Password is   '$card_lot->create_account_mobile_reseller' ");
+    if($user->balance > $form_state['values']['credit']){
+        $result = db_query("SELECT i_pay('%s','%s',%d,1) As cpay ;", $user->name,$form_state['values']['username'],$form_state['values']['credit']);
+        $card_lot = db_fetch_object($result);
+    };        
+    }else {
+            drupal_set_message("Create User ".$form['username']." Fail.",'error');
+        };
+    };
+    
+
+    return drupal_goto('reseller');
+}
+
+function vreseller_topup_form($form_state,$id = NULL) {
+    global $user;
+    if ($id) {
+        $sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and owner='$user->name'";
+        $result = db_query($sqlstr);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            drupal_set_message("User ".$id." Not Found.",'error');
+            return drupal_goto('reseller');
+        };
+        $form['username'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Username"),
+        '#default_value' => $card_lot->username,
+        '#maxlength' => 255,
+        '#required' => true,
+        '#attributes' => array('readonly' => 'readonly'),
+        );
+
+        $form['balance'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Balance"),
+        '#default_value' => $card_lot->balance,
+        '#required' => false,
+        '#attributes' => array('readonly' => 'readonly'),
+        );
+    }else {
+        $form['username'] = array(
+        '#type' => 'textfield',
+        '#title' => t("Username"),
+        '#default_value' => $card_lot->username,
+        '#maxlength' => 255,
+        '#required' => true,
+        );
+    };
+    $result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+    $udetail = db_fetch_object($result);
+    if (!$udetail) {
+        drupal_set_message("Balance Not found. Please contact Admin ",'error');
+        //return $output;
+        //return drupal_goto('reseller');
+    }else{
+        drupal_set_message("Your Balance :".$udetail->balance." ".$udetail->currencysym,'info');
+    }
+
+
+    $form['pin'] = array(
+    '#type' => 'textfield',
+    '#title' => t("TopUP From PIN"),
+    '#default_value' => '',
+    '#required' => false,
+    );
+
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'TopUp',
+    );
+
+
+    $form['tpay'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Transfer From Balance"),
+    '#default_value' => '',
+    '#required' => false,
+    );
+
+    $form['tsubmit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Transfer',
+    );
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vreseller_topup_form_submit($form, &$form_state) {
+    global $user;
+    if ((strlen($form_state['values']['username']) > 0) AND (strlen($form_state['values']['pin']) > 0) ){
+        $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form_state['values']['pin'],$form_state['values']['username']);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+            return drupal_goto('reseller');
+        }else{
+            if ($card_lot->cpay > 0) {
+                drupal_set_message("TopUp From ".$form_state['values']['pin']." Success.");
+                return drupal_goto('reseller/detail/'.$form_state['values']['username']);
+            }else{
+                drupal_set_message("TopUp From ".$form_state['values']['pin']." Fail.",'error');
+                return drupal_goto('reseller');
+            };
+        };
+    };
+    $result = db_query("SELECT balance,currencysym from voipaccount where id=%d ",$user->vuid);
+    $udetail = db_fetch_object($result);
+    if (!$udetail) {
+        drupal_set_message("Balance Not found. Please contact Admin ",'error');
+        return drupal_goto('reseller');
+    }
+
+    if ((strlen($form_state['values']['username']) > 0) AND (strlen($form_state['values']['tpay']) > 0) )
+    if($udetail->balance > $form_state['values']['tpay']){
+        $result = db_query("SELECT i_pay('%s','%s',%d,1) As cpay ;", $user->name,$form_state['values']['username'],$form_state['values']['tpay']);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            drupal_set_message("Transfer ".$form_state['values']['tpay']." Fail.",'error');
+            return drupal_goto('reseller');
+        }else{
+            if ($card_lot->cpay > 0) {
+                drupal_set_message("Transfer ".$form_state['values']['tpay']." Success.");
+                return drupal_goto('reseller/detail/'.$form_state['values']['username']);
+            }else{
+                drupal_set_message("Transfer ".$form_state['values']['tpay']." Fail.",'error');
+                return drupal_goto('reseller');
+            };
+        };
+    };
+
+    drupal_set_message(" Fail.",'error');
+    return drupal_goto('reseller/detail/'.$form_state['values']['username']);
+}
+
+function vreseller_edit_form($form_state,$id = NULL) {
+    global $user;
+    if (!$id) {
+        return drupal_goto('reseller');
+    }
+
+    $sqlstr = "SELECT * FROM vuser1  WHERE username = '$id' and owner='$user->name'";
+    $result = db_query($sqlstr);
+    $card_lot = db_fetch_object($result);
+    if (!$card_lot) {
+        drupal_set_message("User ".$id." Not Found.",'error');
+        //return $output;
+        return drupal_goto('reseller');
+    };
+
+    $form['accountid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Account ID"),
+    '#default_value' => $card_lot->accountid,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->username,
+    '#maxlength' => 255,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Password"),
+    '#default_value' => $card_lot->secret,
+    '#required' => true,
+    );
+    $form['balance'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Balance"),
+    '#default_value' => $card_lot->balance,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $types = array();
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp where id = %d',$card_lot->grpid);
+    while ($object = db_fetch_object($result)) {
+        $names[$object->id] = $object->description;
+    }
+    $form['grpid'] = array(
+    '#type' => 'select',
+    '#title' => t("rate"),
+    '#options' => $names,
+    '#default_value' => $card_lot->grpid,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vreseller_edit_form_submit($form, &$form_state) {
+    if ($form['accountid'] > 0)  {
+        //    $result = db_query("update voipusers set secret = '%s' where username = '%s';", $form['secret'],$form['username']);
+        $result = db_query("update dr_users set plainpass = '%s',pass=MD5('%s') where name = '%s';", $form['secret'],$form['secret'],$form['username']);
+        $card_lot = db_fetch_object($result);
+        $result = db_query("update voiptariffsel set grpid = '%d' where accountid = '%d';", $form['grpid'],$form['accountid']);
+        $card_lot = db_fetch_object($result);
+    };
+    return drupal_goto('reseller');
+}
+
+function vreseller_topup_myaccount_form() {
+
+    if (empty($_SESSION['vreseller_search_filter'])) {
+        $_SESSION['vreseller_search_filter'] = '';
+    }
+
+    $form['tpin'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Top UP From PIN',
+    '#size' => 50,
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Top UP'));
+//    $form['#redirect'] = FALSE;
+    return $form;
+}
+
+function vreseller_topup_myaccount_form_submit($form, &$form_state) {
+    global $user;
+    if (strlen($form['tpin']) > 0) {
+        $result = db_query("SELECT card_pay('%s','%s',1) As cpay ;", $form['tpin'],$user->name);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            drupal_set_message("TopUp From ".$form['tpin']." Fail.",'error');
+            return drupal_goto('reseller');
+        }else{
+            if ($card_lot->cpay > 0) {
+                drupal_set_message("TopUp From ".$form['tpin']." Success.");
+                return drupal_goto('reseller/detail/'.$form['username']);
+            }else{
+                drupal_set_message("TopUp From ".$form['tpin']." Fail.",'error');
+                return drupal_goto('reseller');
+            };
+        };
+    };
+
+    drupal_set_message(" Fail.",'error');
+    return drupal_goto('reseller/detail/'.$form['username']);
+}
+
+
+function vreseller_rate_form_overview() {
+
+    if (empty($_SESSION['vreseller_overview_filter'])) {
+        $_SESSION['vreseller_overview_filter'] = '0';
+    }
+    if (empty($_SESSION['vreseller_search_filter'])) {
+        $_SESSION['vreseller_search_filter'] = '';
+    }
+
+    $form['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vreseller_search_filter']
+    );
+
+    $form['submit'] = array('#type' => 'submit', '#value' =>t('Filter'));
+//    $form['#redirect'] = FALSE;
+
+    return $form;
+}
+
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vreseller_rate_overview() {
+    global $user;
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+
+    $result = db_query('SELECT  DISTINCT(description),grpid As id FROM user_rate_group Where accountid=%d',$user->vuid);
+    $object = db_fetch_object($result);
+    //echo $object->id;
+    $type=$object->id;
+
+    $output = drupal_get_form('vreseller_rate_form_overview');
+
+    $header = array(
+        array('data' => t('Destination'), 'field' => 'description'),
+        array('data' => t('Prefix'), 'field' => 'prefix'),
+        array('data' => t('Price'), 'field' => 'price'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+        array('data' => t('Group'), 'field' => 'group_dsc'),
+    );
+
+    $tablesort = tablesort_sql($header);
+    $type = $_SESSION['vreseller_overview_filter'];
+    $search_str = $_SESSION['vreseller_search_filter'];
+/*
+SELECT voiptariff.id, voiptariffdst.prefix, voiptariffdst.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+   FROM voiptariff
+      LEFT JOIN voiptariffdst ON voiptariff.dstid = voiptariffdst.id
+         LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id;
+*/
+    $sql = "
+   SELECT voiptariff.id, voiptariff.prefix, voiptariff.description, voiptariff.price, voiptariff.currencysym, voiptariff.grpid, voiptariffgrp.description AS group_dsc, voiptariffgrp.uid, voiptariff.initialincrement, voiptariff.regularincrement, voiptariff.graceperiod
+   FROM voiptariff
+         LEFT JOIN voiptariffgrp ON voiptariff.grpid = voiptariffgrp.id
+  ";
+    $sql_count = "select count(id) from voiptariff";
+    //echo "type: ".$type;
+    //if ($type != '0') {
+    if ($object->id != '0') {
+        $sql .= " WHERE grpid = $object->id ";
+        $sql_count .= " WHERE grpid = $object->id ";
+    }else{
+        $sql .= " WHERE 0=0 ";
+        $sql_count .= " WHERE 0=0 ";
+
+    }
+    if ($search_str != '') {
+        $sql .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%' AND grpid = $object->id ";
+        $sql_count .= " AND upper(voiptariff.description) LIKE upper('$search_str%') Or prefix LIKE '$search_str%' AND grpid = $object->id";
+    };
+    //echo $sql;
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->description,
+            $rate->prefix,
+            $rate->price,
+            $rate->currencysym,
+            $rate->group_dsc,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+
+    return $output;
+}
+
+function vreseller_rate_form_overview_submit($form, &$form_state) {
+    $_SESSION['vreseller_overview_filter'] = $form_state['values']['filter'];
+    $_SESSION['vreseller_search_filter'] = $form_state['values']['search'];
+}
+
+function vreseller_detail($username = NULL) {
+    global $user;
+    $icons = array(WATCHDOG_NOTICE  => '',
+        WATCHDOG_WARNING => theme('image', 'misc/watchdog-warning.png', t('warning'), t('warning')),
+        WATCHDOG_ERROR   => theme('image', 'misc/watchdog-error.png', t('error'), t('error')));
+    $classes = array(WATCHDOG_NOTICE => 'watchdog-notice', WATCHDOG_WARNING => 'watchdog-warning', WATCHDOG_ERROR => 'watchdog-error');
+    $udetail = array();
+    if (strlen($username)==0)
+    $username = $user->name;
+    $result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+    $udetail = db_fetch_object($result);
+    $output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currencysym;
+    $output .= '<br><br><b>Payment:</b><br>';
+
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'date','sort'=>'desc'),
+        array('data' => t('Amount'), 'field' => 'paid'),
+        array('data' => t('Ref'), 'field' => 'ref'),
+    );
+
+    $sql = "   SELECT * from vpayment where username='$username'   ";
+    $sql_count = "select count(username) from vpayment where username='$username'";
+
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 10,0,$sql_count);
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->date,
+            $rate->paid,
+            $rate->ref,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 10, 0);
+
+    return $output;
+}
+
+function vreseller_cdr($username = NULL) {
+    global $user;
+    if (strlen($username)==0)
+    $username = $user->name;
+
+    $udetail = array();
+    $result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+    $udetail = db_fetch_object($result);
+    $output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currencysym;
+    $output .= '<br><br><b>Payment:</b><br>';
+
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+        array('data' => t('Number'), 'field' => 'calledstationid'),
+        array('data' => t('Destination'), 'field' => 'tariffdesc'),
+        array('data' => t('Rate'), 'field' => 'price'),
+        array('data' => t('Duration'), 'field' => 'duration'),
+        array('data' => t('Total'), 'field' => 'cost'),
+        array('data' => t('Service <br>Charge'), 'field' => 'Service charge'),
+    );
+    $sql = " SELECT username,date_trunc('min',acctstarttime) as cdate,calledstationid,tariffdesc,price,duration,
+  cost,o_service_charge from voipcall Where username = '$username' ";
+
+    $tablesort = tablesort_sql($header);
+    $sql_count = "Select count(username) from voipcall Where username = '$username'";
+    $result = pager_query($sql . $tablesort, 30,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->cdate,
+            $rate->calledstationid,
+            $rate->tariffdesc,
+            $rate->price,
+            $rate->duration,
+            $rate->cost,
+            $rate->o_service_charge,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+    return $output;
+}
+
+function vreseller_topup_myaccount() {
+    //  print l("hello dome",'?node/2');
+    //http://221.128.124.203/callsbuy/admin/cart/add/destination=node/3
+    $output = l('<img src="https://www.paypal.com/en_US/i/btn/x-click-butcc.gif">', "paypal", array('absolute' => TRUE, 'html' => TRUE));
+    $output .= drupal_get_form('vreseller_topup_myaccount_form');
+    return $output;
+}
+

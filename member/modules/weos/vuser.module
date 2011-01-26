@@ -1,0 +1,497 @@
+<?php
+function vuser_menu() {
+
+        $items['weos/user'] = array(
+        'menu_name' => 'features',
+      'description' => 'View user.', 'title' => 'User',
+      'page callback' => 'vuser_overview',
+      'weight' => -9,
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK
+        );
+
+        $items['weos/user/list'] = array(
+      'description' => 'View user.', 'title' => 'List',
+      'page callback' => 'vuser_overview',
+        'menu_name' => 'features',
+      'weight' => -1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_DEFAULT_LOCAL_TASK
+        );
+
+        $items['weos/user/detail'] = array(
+      'description' => 'View Payment.', 'title' => 'Payment',
+      'page callback' => 'vuser_detail',
+      'weight' => 1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK
+        );
+
+        $items['weos/user/cdr'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vuser_cdr',
+      'weight' => 1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK
+        );
+
+        $items['weos/user/add'] = array(
+      'title' => 'Add',
+        'menu_name' => 'features',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vuser_form'),
+      'access arguments' => array('access rate'),
+      'type' => MENU_LOCAL_TASK
+      );
+
+        $items['weos/user/edit'] = array(
+      'description' => 'View user.', 'title' => 'Edit',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('vuser_edit_form'),
+      'weight' => 10,
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK
+        );
+
+        $items['weos/user/create'] = array(
+      'description' => 'Create user.', 'title' => 'Edit',
+      'page callback' => 'vuser_create_account',
+      'weight' => 10,
+      'access arguments' => array('create user'),
+      'type' => MENU_CALLBACK
+        );
+
+        $items['weos/user/delete'] = array(
+	'title' => 'Delete',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('vuser_confirm_delete'),
+	'access callback' => 'user_access',
+        'access arguments' => array('access rate'),
+	'type' => MENU_CALLBACK,
+	);
+
+        $items['weos/user/guser'] = array(
+      'description' => 'View CDR.', 'title' => 'CDR',
+      'page callback' => 'vuser_load',
+      'weight' => 1,
+      'access arguments' => array('access rate'),
+      'type' => MENU_CALLBACK
+        );
+
+    return $items;
+}
+
+function vuser_confirm_delete(&$form_state, $id=null) {
+    if (!$id) {
+        return drupal_goto('weos/user');
+    }
+  $account = user_load(array('name' => $id, 'status' => 1));
+  $form['_account'] = array('#type' => 'value', '#value' => $account);
+
+  return confirm_form($form,
+    t('Are you sure you want to delete the account %name?', array('%name' => $account->name)),
+    'weos/user',
+    t('All submissions made by this user will be attributed to the anonymous account. This action cannot be undone.'),
+    t('Delete'), t('Cancel'));
+}
+
+function vuser_confirm_delete_submit($form, &$form_state) {
+  user_delete($form_state['values'], $form_state['values']['_account']->uid);
+  drupal_set_message(t('%name has been deleted.', array('%name' => $form_state['values']['_account']->name)));
+
+  if (!isset($_REQUEST['destination'])) {
+    $form_state['redirect'] = 'weos/user';
+  }
+}
+
+function vuser_load($tuser) {
+    global $user;
+    $result = db_query("SELECT * FROM {users} u WHERE name='%s'", $tuser);
+
+    if (db_num_rows($result)) {
+        $user = db_fetch_object($result);
+        $user = drupal_unpack($user);
+
+        $user->roles = array();
+        if ($user->uid) {
+            $user->roles[DRUPAL_AUTHENTICATED_RID] = 'authenticated user';
+        }
+        else {
+            $user->roles[DRUPAL_ANONYMOUS_RID] = 'anonymous user';
+        }
+        $result = db_query('SELECT r.rid, r.name FROM {role} r INNER JOIN {users_roles} ur ON ur.rid = r.rid WHERE ur.uid = %d', $user->uid);
+        while ($role = db_fetch_object($result)) {
+            $user->roles[$role->rid] = $role->name;
+        }
+        user_module_invoke('load', $array, $user);
+    }
+    else {
+        $user = FALSE;
+    }
+
+    return $user;
+}
+
+function vuser_create_account($username = NULL,$password = NULL,$secret) {
+    //echo $username.' Pass: '.$password.' Email:'.$email;
+    if ($secret=="mypass") {
+        $sqlstr = "SELECT * FROM {users}  WHERE name = '$username'";
+        $result = db_query($sqlstr);
+        $ck = db_fetch_object($result);
+        // admin uid = 1
+        if ($ck->uid > 1 ){
+            db_query("UPDATE {users} set pass=md5('%s'),plainpass='%s' where name='%s'",$password,$password,$username);
+            //echo 2;
+        }else{
+            //echo $ck->uid;
+            user_save(array ('name' => $username,'uid' => $ck->uid),array ('uid' => $ck->uid,'name' => $username,'pass' => $password,'status' => 1));
+            //echo 1;
+        };
+    }else{
+        //echo -1;
+    };
+};
+/**
+ * Implementation of hook_cron().
+ *
+ * Remove expired log messages and flood control events.
+ */
+function vuser_cron() {
+    //  db_query('DELETE FROM {watchdog} WHERE timestamp < %d', time() - variable_get('watchdog_clear', 604800));
+    //  db_query('DELETE FROM {flood} WHERE timestamp < %d', time() - 3600);
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function vuser_user($op, &$edit, &$user) {
+
+}
+
+function vuser_form_overview() {
+/* 
+ $filters['status'] = array('title' => t('status'),
+      'options' => array('status-1'   => t('published'),     'status-0' => t('not published'),
+                   'promote-1'  => t('promoted'),      'promote-0' => t('not promoted'),
+                   'sticky-1'   => t('sticky'),        'sticky-0' => t('not sticky')));
+ $filters['type'] = array('title' => t('type'), 'options' => node_get_types('names'));
+*/
+
+//    return null;
+    if (empty($_SESSION['vuser_search_filter'])) {
+        $_SESSION['vuser_search_filter'] = '';
+    }
+    $form['filter_group'] = array('#type' => 'fieldset',
+    '#title' => t('Search'),
+    '#prefix' => '<div class="container-inline">',
+    '#suffix' => '</div>',
+    );
+    $form['filter_group']['search'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Search',
+    '#size' => 20,
+    '#default_value' => $_SESSION['vuser_search_filter']
+    );
+    $form['filter_group']['submit'] = array('#type' => 'submit', '#value' =>t('Search'));
+    return $form;
+}
+/**
+ * Menu callback; displays a listing of log messages.
+ */
+function vuser_overview() {
+
+    $output = drupal_get_form('vuser_form_overview');
+    //username 	secret 	balance 	currencysym 	grpid 	accountid 	description 	create_date
+    $header = array(
+        array('data' => t('Username'), 'field' => 'name'),
+        array('data' => t('Password'), 'field' => 'plainpass'),
+        //array('data' => t('Balance'), 'field' => 'balance'),
+        array('data' => t('Rate'), 'field' => 'description'),
+        //array('data' => t('Currency'), 'field' => 'currencysym'),
+        //array('data' => t('Prefix'), 'field' => 'prefix'),
+        //array('data' => t('Expire Date'), 'field' => 'exp_date'),
+        //array('data' => t('Owner'), 'field' => 'owner'),
+        // exp_date
+        array('data' => t('')),
+        array('data' => t('')),
+        array('data' => t('')),
+        array('data' => t('')),
+    );
+
+    $tablesort = tablesort_sql($header);
+    $search_str = $_SESSION['vuser_search_filter'];
+    $sql = "SELECT *,voiptariffgrp.description 
+     FROM dr_users As d
+              LEFT JOIN voiptariffgrp ON grpid = voiptariffgrp.id
+                WHERE d.uid > 1 ";
+    if ($search_str != '') {
+        $sql .= " AND name LIKE '$search_str%' ";
+    }else
+    $sql .= " ";
+
+    //echo $sql;
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 20);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            array('data' => l($rate->name,'weos/user/detail/'.$rate->name)),
+            $rate->plainpass,
+           // $rate->balance,
+            $rate->description,
+            //$rate->currencysym,
+            //$rate->prefix.'#',
+            $rate->cexp_date,
+            //$rate->owner,
+            array('data' => l('CDR','weos/user/cdr/'.$rate->name)),
+            array('data' => l('Payment','weos/user/detail/'.$rate->name).'  <br>'.l('Add Credit','payment/add/'.$rate->name)),
+            array('data' => l('Edit','weos/user/edit/'.$rate->name).' <br>'.l('Delete','weos/user/delete/'.$rate->name)),
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 20, 0);
+
+    return $output;
+}
+
+
+function vuser_form_overview_submit($form, &$form_state) {
+    $_SESSION['vuser_search_filter'] = $form_state['values']['search'];
+}
+
+
+function _vuser_get_vuser_group() {
+    $types = array();
+
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $types[] = array($object->id => $object->description);
+    }
+
+    return $types;
+}
+
+function vuser_detail($username = NULL) {
+    //$udetail = array();
+    $udetail->name = $username;
+    $udetail = vsystem_sync_user($udetail);
+    
+    //$result = db_query("SELECT balance,currencysym from vuser where username='%s'",$username);
+    //$udetail = db_fetch_object($result);
+
+    $output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currency;
+    $output .= '<br><br><b>Payment:</b><br>';
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'date','sort'=>'desc'),
+        array('data' => t('Amount'), 'field' => 'paid'),
+        array('data' => t('Ref'), 'field' => 'ref'),
+    );
+
+    $sql = "   SELECT * from vpayment where name='$username'   ";
+    $sql_count = "select count(username) from vpayment where name='$username'";
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 10,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->name,
+            $rate->date,
+            $rate->paid/100,
+            $rate->ref,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 10, 0);
+
+    return $output;
+}
+
+function vuser_cdr($username = NULL) {
+
+    $udetail->name = $username;
+    $udetail=vsystem_sync_user($udetail);    
+    $output = 'Account :'.$username.'<br>'.'Balance :'.$udetail->balance.' '.$udetail->currency;
+    $output .= '<br><br><b>Payment:</b><br>';
+
+    //  $sql = " SELECT username,acctstarttime,calledstationid,tariffdesc,price,duration,cost,currencysym from voipcall Where username = '$username' ";
+    //  $sql_count = "select count(username) from voipcall where username='$username'";
+
+
+    $header = array(
+        array('data' => t('Username'), 'field' => 'username'),
+        array('data' => t('Date'), 'field' => 'acctstarttime','sort'=>'desc'),
+        array('data' => t('Number'), 'field' => 'calledstationid'),
+        array('data' => t('Destination'), 'field' => 'tariffdesc'),
+        array('data' => t('Rate'), 'field' => 'price'),
+        array('data' => t('Duration'), 'field' => 'duration'),
+        array('data' => t('Total'), 'field' => 'cost'),
+        array('data' => t('Currency'), 'field' => 'currencysym'),
+    );
+    $sql = " SELECT username,acctstarttime,calledstationid,tariffdesc,price,duration,
+  cost,currencysym from voipcall Where username = '$username' ";
+    $sql_count = "Select count(username) from voipcall Where username = '$username'";
+
+    $tablesort = tablesort_sql($header);
+    $result = pager_query($sql . $tablesort, 50,0,$sql_count);
+
+    while ($rate = db_fetch_object($result)) {
+        $rows[] =
+        array(
+            // Cells
+            $rate->username,
+            $rate->acctstarttime,
+            $rate->calledstationid,
+            $rate->tariffdesc,
+            $rate->price,
+            $rate->duration,
+            $rate->cost,
+            $rate->currencysym,
+        );
+    }
+
+    if (!$rows) {
+        $rows[] = array(array('data' => t('Data Not Found.'), 'colspan' => 20));
+    }
+
+    $output .= theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, 0);
+    return $output;
+}
+
+function vuser_form($form_state = array(),$id = NULL) {
+    if ($username) {
+        $result = db_query("SELECT id FROM dr_users  WHERE name = '%s'", $id);
+        $card_lot = db_fetch_object($result);
+        if (!$card_lot) {
+            return drupal_goto('weos/user');
+        }
+    }
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#maxlength' => 64,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vuser_form_submit($form, &$form_state) {
+    $result = db_query("SELECT create_account_mobile('%s');", $form_state['values']['username']);
+    $card_lot = db_fetch_object($result);
+    if ($card_lot) {
+        if ($card_lot->create_account_mobile > 0 ) {
+            $_SESSION['vuser_search_filter'] = $form_state['values']['username'];
+            drupal_set_message("Successfull Password is   '$card_lot->create_account_mobile' ");
+        }
+    }
+    return drupal_goto('weos/user');
+}
+
+function vuser_edit_form($form_state = array(),$id = NULL) {
+    if (!$id) {
+        return drupal_goto('weos/user');
+    }
+    $udetail->name=$id;
+    $udetail=vsystem_sync_user($udetail);
+    if (!$udetail->balance)
+       $udetail->balance = 0;
+    $sqlstr = "SELECT *,vuid as accountid,plainpass As secret FROM dr_users  WHERE name = '$id'";
+    $result = db_query($sqlstr);
+    $card_lot = db_fetch_object($result);
+    $form['accountid'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Account ID"),
+    '#default_value' => $card_lot->accountid,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Username"),
+    '#default_value' => $card_lot->name,
+    '#maxlength' => 255,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Password"),
+    '#default_value' => $card_lot->secret,
+    '#required' => true,
+    );
+    $form['lang'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Language"),
+    '#default_value' => $card_lot->language,
+    '#required' => true,
+    );
+    $form['balance'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Balance"),
+    '#default_value' => $udetail->balance,
+    '#required' => true,
+    '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $types = array();
+    $result = db_query('SELECT DISTINCT(description),id FROM voiptariffgrp ORDER BY description');
+    while ($object = db_fetch_object($result)) {
+        $names[$object->id] = $object->description;
+    }
+    $form['grpid'] = array(
+    '#type' => 'select',
+    '#title' => t("rate"),
+    '#options' => $names,
+    '#default_value' => $card_lot->grpid,
+    '#required' => true,
+    );
+
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    );
+
+
+    return $form;
+}
+
+/**
+ * Add/Edit bookmark form submit
+ */
+function vuser_edit_form_submit($form, &$form_state) {
+    if ($form['accountid'] > 0)  {
+        $result = db_query("update dr_users set language='%s',plainpass = '%s',pass=MD5('%s') where name = '%s';", 
+            $form_state['values']['lang'],$form_state['values']['secret'],$form_state['values']['secret'],$form_state['values']['username']);
+        $card_lot = db_fetch_object($result);
+        
+    };
+    return drupal_goto('weos/user');
+}

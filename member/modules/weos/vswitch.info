@@ -1,0 +1,8 @@
+name = Weos XML CURL For SoftSwitch
+description = A XML CURL For SoftSwitch
+package = Weos
+version = "5.0"
+project = "WeOS"
+
+
+core = 6.x

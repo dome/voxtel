@@ -1,0 +1,88 @@
+<?php
+
+/**
+ * Implementation of hook_menu().
+ */
+
+function vswitch_menu() {
+  $items['weos/getuser'] = array(
+    'title' => 'Billing',
+    'weight' => 0, 
+    'page callback' => 'vswitch_getuser',
+    'page arguments' => array(),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  ); 
+  $items['getuser'] = array(
+    'title' => 'Billing',
+    'weight' => 0, 
+    'page callback' => 'vswitch_getuser',
+    'page arguments' => array(),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  ); 
+
+  return $items;
+}
+
+function vswitch_getuser() {
+$sipserver = array(1 => '203.151.233.195',2 => '115.178.61.98');
+//    print_r($_REQUEST);
+if(array_search($_REQUEST["key_value"], $sipserver) <= 0 ) {
+//    header('Content-Type: text/xml');
+//    print_r($_REQUEST);
+    die($response);
+}
+  
+//$_REQUEST["action"]=="sip_auth")
+$username=$_REQUEST["sip_auth_username"];
+$domain = $_REQUEST['domain'];
+  $result = db_query("SELECT username,secret from vuser1 where username='%s' ",$username);
+  $udetail = db_fetch_object($result);
+  if ($udetail) {
+
+$response = <<< XML
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="freeswitch/xml">
+  <section name="directory">
+    <domain name="$domain">
+    <groups>
+      <group name="default">
+	<users>
+	    <user id="$username">
+		<params>
+    		    <param name="password" value="$udetail->secret"/>
+		</params>
+		<variables>
+    		    <variable name="accountcode" value="$username"/>
+    		    <variable name="user_context" value="internal"/>
+    		    <variable name="effective_caller_id_name" value="$username $username"/>
+    		    <variable name="effective_caller_id_number" value="$username"/>
+    		    <variable name="outbound_caller_id_name" value="$${outbound_caller_name}"/>
+    		    <variable name="outbound_caller_id_number" value="$${outbound_caller_id}"/>
+		</variables>
+	    </user>
+	</users>
+      </group>
+    </groups>
+    </domain>
+  </section>
+</document>
+XML;
+
+  }else{
+$response = <<< XML
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="freeswitch/xml">
+  <section name="directory">
+    <domain name="$domain">
+    </domain>
+  </section>
+</document>
+XML;
+  }
+
+header('Content-Type: text/xml');
+die($response);
+
+};
